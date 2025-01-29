@@ -36,7 +36,7 @@ build-macos-app:
 run-macos-console:
     # Options are explained at
     # https://github.com/angband/angband/blob/e723430/src/main-gcu.c#L1465-L1491
-    ./angband -mgcu -- -n7 -right "60x27,*" -bottom "*x12"
+    ./angband -mgcu -- -n6 -right "60x27,*" -bottom "*x12"
 
 # run Angband as a native macOS app
 [group('app')]
