@@ -1109,12 +1109,14 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
         dam = ((borg.trait[BI_CLEVEL] / 12) * ((50 + kill->injury) + 1)) / 2;
         break;
 
-    case BORG_ATTACK_ELEC_STRIKE:
-        if (rf_has(r_ptr->flags, RF_IM_ELEC))
-            dam = 0;
-        else if (borg_grids[kill->pos.y][kill->pos.x].feat == FEAT_NONE)
-            dam = 0;
-        break;
+	case BORG_ATTACK_ELEC_STRIKE:
+		if (rf_has(r_ptr->flags, RF_IM_ELEC))
+			dam = 0;
+        /* don't let lightning strike pass through unknown squares */
+		else if (!borg_projectable_pure(borg.c.y, borg.c.x, kill->pos.y, 
+            kill->pos.x))
+			dam = 0;
+		break;
     }
 
     /* use Missiles on certain types of monsters */
@@ -4011,14 +4013,14 @@ int borg_calculate_attack_effectiveness(int attack_type)
         return (borg_attack_aux_spell_bolt(
             RIVER_OF_LIGHTNING, rad, dam, BORG_ATTACK_PLASMA, 20, true));
 
-    /* spell -- Spear of Oromë */
+    /* spell -- Spear of Orom(e + diaresis) */
     case BF_SPELL_SPEAR_OF_OROME:
         rad = 0;
         dam = ((borg.trait[BI_CLEVEL] / 2) + (8 + 1)) / 2;
         return (borg_attack_aux_spell_bolt(
             SPEAR_OF_OROME, rad, dam, BORG_ATTACK_HOLY_ORB, z_info->max_range, false));
 
-    /* spell -- Light of Manwë */
+    /* spell -- Light of Manw(e + diaresis) */
     case BF_SPELL_LIGHT_OF_MANWE:
         rad = 0;
         dam = borg.trait[BI_CLEVEL] * 5 + 100;
@@ -4397,12 +4399,12 @@ int borg_calculate_attack_effectiveness(int attack_type)
         return (borg_attack_aux_activation(
             act_fire_bolt, rad, dam, BORG_ATTACK_FIRE, true, -1));
 
-    /* Artifact -- Anduril & Firestar- fire bolt 72*/
-    case BF_ACT_FIRE_BOLT72:
-        rad = 0;
+    /* Artifact -- Anduril & Firestar- fire ball 72*/
+    case BF_ACT_FIRE_BALL72:
+        rad = 2;
         dam = 72;
         return (borg_attack_aux_activation(
-            act_fire_bolt72, rad, dam, BORG_ATTACK_FIRE, true, -1));
+            act_fire_ball72, rad, dam, BORG_ATTACK_FIRE, true, -1));
 
     /* Artifact -- Gothmog- FIRE BALL 144 */
     case BF_ACT_FIRE_BALL:
@@ -4425,7 +4427,7 @@ int borg_calculate_attack_effectiveness(int attack_type)
         return (borg_attack_aux_activation(
             act_cold_ball50, rad, dam, BORG_ATTACK_COLD, true, -1));
 
-    /* Artifact -- Aranrúth- frost bolt 12d8*/
+    /* Artifact -- Aranr(u + acute accent)th- frost bolt 12d8*/
     case BF_ACT_COLD_BOLT2:
         rad = 0;
         dam = (12 * (8 + 1) / 2);
@@ -4507,7 +4509,7 @@ int borg_calculate_attack_effectiveness(int attack_type)
         return (borg_attack_aux_activation(
             act_dispel_evil, rad, dam, BORG_ATTACK_DISP_EVIL, true, -1));
 
-    /* Artifact -- Eöl -- Mana Bolt 12d8 */
+    /* Artifact -- E(o + diaresis)l -- Mana Bolt 12d8 */
     case BF_ACT_MANA_BOLT:
         rad = 0;
         dam = (12 * (8 + 1)) / 2;

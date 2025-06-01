@@ -145,7 +145,7 @@ bool borg_check_light_only(void)
          * 4 corners   3 corners    2 corners    1 corner    0 corners
          * ###         ##.  #..     ##.  #..     .#.         .#.  ... .#.
          * .@.         .@.  .@.     .@.  .@.     .@.         #@#  .@. .@.
-         * ###         ###  ###     ##.  #..     ##.         .#.  ... .#.
+         * ###         ###  ###     ##.  #..     ##.         .#.  ... .#.
          *
          * There's actually no way to tell which are rooms and which are
          * corridors from diagonals except 4 (always a corridor) and
@@ -551,10 +551,27 @@ static bool borg_refuel_lantern(void)
 
     /* None available check for lantern */
     if (i < 0) {
+        /* get first lantern */
         i = borg_slot(TV_LIGHT, sv_light_lantern);
 
-        /* It better have some oil left */
-        if (i >= 0 && borg_items[i].timeout <= 0)
+        /* loop through lanterns (they should be next to each other) */
+        for (; i < z_info->pack_size; i++) {
+            if (borg_items[i].tval != TV_LIGHT ||
+                borg_items[i].sval != sv_light_lantern) {
+                i = -1;
+                break;
+            }
+
+            /* if this lantern is "Everburning" skip it */
+            if (of_has(borg_items[i].flags, OF_NO_FUEL)) 
+                continue;
+
+            /* It better have some oil left */
+            if (borg_items[i].timeout > 0) 
+                break;
+        }
+
+        if (i >= z_info->pack_size) 
             i = -1;
     }
 
