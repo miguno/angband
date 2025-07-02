@@ -48,13 +48,9 @@
 #include "borg-trait.h"
 #include "borg.h"
 
-/*
-  * Name segments for random player names
-  * Copied Cth by DvE
-  * Copied from borgband by APW
-  */
+/* Name segments for random player names */
 
-  /* Dwarves */
+/* Dwarves */
 static const char *dwarf_syllable1[] =
 {
     "B", "D", "F", "G", "Gl", "H", "K", "L",
@@ -183,10 +179,6 @@ static const char *orc_syllable3[] =
 
 /*
  * Random Name Generator
- * based on a Javascript by Michael Hensley
- * "http://geocities.com/timessquare/castle/6274/"
- * Copied from Cth by DvE
- * Copied from borgband by APW
  */
 static void create_random_name(int race, char *name, size_t name_len)
 {
@@ -490,7 +482,7 @@ void reincarnate_borg(void)
     /* Start in town */
     player->depth = 0;
 
-    /* Hack -- seed for flavors */
+    /* Seed for flavors */
     seed_flavor = randint0(0x10000000);
 
     /* Embody */
@@ -511,10 +503,10 @@ void reincarnate_borg(void)
     /* Give the player some money */
     player->au = player->au_birth = z_info->start_gold;
 
-    /* Hack - need some HP */
+    /* Need some HP */
     borg_roll_hp();
 
-    /* Hack - player knows all combat runes.  Maybe make them not runes? NRM */
+    /* Player knows all combat runes. Maybe make them not runes? */
     player->obj_k->to_a = 1;
     player->obj_k->to_h = 1;
     player->obj_k->to_d = 1;
@@ -554,10 +546,10 @@ void reincarnate_borg(void)
         deactivate_randart_file();
     }
 
-    /* Hack -- flush it */
+    /* Flush it */
     Term_fresh();
 
-    /*** Hack -- react to race and class ***/
+    /*** React to race and class ***/
 
     /* Notice the new race and class */
     borg_prepare_race_class_info();

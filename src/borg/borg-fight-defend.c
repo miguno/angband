@@ -303,18 +303,18 @@ static int borg_defend_aux_speed(int p1)
 
     /* if scaryguy around cast it. */
     if (scaryguy_on_level) {
-        /* HACK pretend that it was scary and will be safer */
+        /* Pretend that it was scary and will be safer */
         p2 = p2 * 3 / 10;
     }
 
     /* if we are fighting a unique cast it. */
     if (good_speed && borg_fighting_unique) {
-        /* HACK pretend that it was scary and will be safer */
+        /* Pretend that it was scary and will be safer */
         p2 = p2 * 7 / 10;
     }
     /* if we are fighting a unique and a summoner cast it. */
     if (borg_fighting_summoner && borg_fighting_unique) {
-        /* HACK pretend that it was scary and will be safer */
+        /* Pretend that it was scary and will be safer */
         p2 = p2 * 7 / 10;
     }
     /* if the unique is Sauron cast it */
@@ -490,7 +490,7 @@ static int borg_defend_aux_resist_fecap(int p1)
     borg.temp.res_acid = save_acid;
     borg.temp.res_pois = save_poison;
 
-    /* Hack -
+    /*
      * If the borg is fighting a particular unique enhance the
      * benefit of the spell.
      */
@@ -498,7 +498,7 @@ static int borg_defend_aux_resist_fecap(int p1)
         && (streq(r_info[unique_on_level].name, "The Tarrasque")))
         p2 = p2 * 8 / 10;
 
-    /* Hack -
+    /*
      * If borg is high enough level, he does not need to worry
      * about mana consumption.  Cast the good spell.
      */
@@ -581,7 +581,7 @@ static int borg_defend_aux_resist_f(int p1)
     p2                 = borg_danger(borg.c.y, borg.c.x, 1, false, false);
     borg.temp.res_fire = save_fire;
 
-    /* Hack -
+    /*
      * If the borg is fighting a particular unique enhance the
      * benefit of the spell.
      */
@@ -671,7 +671,7 @@ static int borg_defend_aux_resist_c(int p1)
     p2                 = borg_danger(borg.c.y, borg.c.x, 1, false, false);
     borg.temp.res_cold = save_cold;
 
-    /* Hack -
+    /*
      * If the borg is fighting a particular unique enhance the
      * benefit of the spell.
      */
@@ -1770,7 +1770,7 @@ static int borg_defend_aux_mass_genocide(int p1)
     if (p2 < 0)
         p2 = 0;
 
-    /* if strain (plus a pad incase we did not know about some monsters)
+    /* if strain (plus a pad in case we did not know about some monsters)
      * is greater than hp, don't cast it
      */
     if ((hit * 12 / 10) >= borg.trait[BI_CURHP])
@@ -1833,7 +1833,7 @@ static int borg_defend_aux_mass_genocide(int p1)
 }
 
 /* This will simulate and cast the genocide spell.
- * There are two seperate functions happening here.
+ * There are two separate functions happening here.
  * 1. will genocide the race which is immediately threatening the borg.
  * 2. will genocide the race which is most dangerous on the level.  Though it
  * may not be threatening the borg right now.  It was considered to nuke the
@@ -1894,7 +1894,7 @@ static int borg_defend_aux_genocide(int p1)
         return 0;
 
     /* Normalize the p1 value.  It contains danger added from
-     * regional fear and monster fear.  Which wont be counted
+     * regional fear and monster fear.  Which won't be counted
      * in the post-genocide checks
      */
     if (borg_fear_region[borg.c.y / 11][borg.c.x / 11])
@@ -2028,7 +2028,7 @@ static int borg_defend_aux_genocide(int p1)
         if (b_threat[biggest_threat] < borg.trait[BI_MAXHP] * 3)
             biggest_threat = 0;
 
-        /* Too painful to cast it (padded to be safe incase of unknown monsters)
+        /* Too painful to cast it (padded to be safe in case of unknown monsters)
          */
         if ((b_kill_count[biggest_threat] * 4) * 12 / 10
             >= borg.trait[BI_CURHP])
@@ -2057,7 +2057,7 @@ static int borg_defend_aux_genocide(int p1)
 
     /* Consider the immediate threat genocide */
     if (biggest_danger) {
-        /* Too painful to cast it (padded to be safe incase of unknown monsters)
+        /* Too painful to cast it (padded to be safe in case of unknown monsters)
          */
         if ((b_kill_count[biggest_danger] * 4) * 12 / 10
             >= borg.trait[BI_CURHP])
@@ -2519,7 +2519,7 @@ static int borg_defend_aux_banishment(int p1)
     }
 
     /* Set P2 to be P1 and subtract the danger from each monster
-     * which will be booted.  Non booted monsters wont decrement
+     * which will be booted.  Non booted monsters won't decrement
      * the p2
      */
     p2 = p1;
@@ -2722,7 +2722,7 @@ static int borg_defend_aux_inviso(int p1)
         return (10);
     }
 
-    /* ah crap, I guess I wont be able to see them */
+    /* ah crap, I guess I won't be able to see them */
     return 0;
 }
 
@@ -2880,7 +2880,7 @@ static int borg_defend_aux_panel_shift(void)
     /* check to make sure its appropriate */
     {
 
-        /* Hack Not if I just did one */
+        /* Not if I just did one */
         if (borg.when_shift_panel
             && (borg_t - borg.when_shift_panel <= 10
                 || borg_t - borg_t_morgoth <= 10)) {

@@ -159,6 +159,8 @@ Inscribing an item with ``^``, followed by a command letter:
 	very annoying!
 
 
+.. _showing-extra-info-in-subwindows:
+
 Showing extra info in subwindows
 ================================
 
@@ -168,6 +170,8 @@ You may then need to make the window visible using the "window" menu from the me
 
 There are a variety of subwindow choices and you should experiment to see which ones are the most useful for you.
 
+
+.. _keymaps:
 
 Keymaps
 =======

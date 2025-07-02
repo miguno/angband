@@ -89,7 +89,7 @@ int *borg_cfg;
 bool borg_active; /* Actually active */
 bool borg_cancel; /* Being cancelled */
 bool borg_save          = false; /* do a save next level */
-bool borg_graphics      = false; /* rr9's graphics */
+bool borg_graphics      = false; /* graphics mode */
 
 int16_t old_depth       = 128;
 int16_t borg_respawning = 0;
@@ -98,7 +98,7 @@ int w_x; /* Current panel offset (X) */
 int w_y; /* Current panel offset (Y) */
 
 /*
- * Hack -- Time variables
+ * Time variables
  */
 int16_t borg_t = 0L; /* Current "time" */
 int32_t borg_began; /* When this level began */
@@ -110,11 +110,11 @@ int16_t borg_t_morgoth = 0L; /* Last time I saw Morgoth */
  */
 uint16_t borg_step = 0;
 
-// !FIX !AJG double check this comment
+// !FIX double check this comment
 /*
- * This file implements the "Ben Borg", an "Automatic Angband Player".
+ * This file implements the Borg, an "Automatic Angband Player".
  *
- * Use of the "Ben Borg" requires re-compilation with ALLOW_BORG defined,
+ * Use of the Borg requires re-compilation with ALLOW_BORG defined,
  * and with the various "borg*.c" files linked into the executable.
  *
  * The "do_cmd_borg()" function, called when the user hits "^Z", allows
@@ -133,16 +133,16 @@ uint16_t borg_step = 0;
  * (3) Some "historical" information (killed uniques, maximum dungeon depth)
  *     is "stolen" from the game.
  *
- * The Ben Borg is only supposed to "know" what is visible on the screen,
+ * The Borg is only supposed to "know" what is visible on the screen,
  * which it learns by using the "term.c" screen access function "COLOUR_what()",
  * the cursor location function "COLOUR_locate()", and the cursor visibility
  * extraction function "COLOUR_get_cursor()".
  *
- * The Ben Borg is only supposed to "send" keypresses when the "COLOUR_inkey()"
+ * The Borg is only supposed to "send" keypresses when the "COLOUR_inkey()"
  * function asks for a keypress, which is accomplished by using a special
  * function hook in the "z-term.c" file, which allows the Borg to "steal"
  * control from the "COLOUR_inkey()" and "COLOUR_flush(0, 0, 0)" functions. This
- * allows the Ben Borg to pretend to be a normal user.
+ * allows the Borg to pretend to be a normal user.
  *
  * The Borg is thus allowed to examine the screen directly (by efficient
  * direct access of the "Term->scr->a" and "Term->scr->c" arrays, which
@@ -225,7 +225,7 @@ static struct keypress internal_borg_inkey(int flush_first)
     char buffer[1024];
     char *buf = buffer;
 
-    bool borg_prompt; /* ajg  For now we can just use this locally.
+    bool borg_prompt; /* For now we can just use this locally.
                           in the 283 borg he uses this to optimize knowing if
                           we are waiting at a prompt for info */
     /* Locate the cursor */
@@ -256,7 +256,7 @@ static struct keypress internal_borg_inkey(int flush_first)
         }
 
         /* Done */
-        /* HACK need to flush the key buffer to change modes */
+        /* Need to flush the key buffer to change modes */
         key.type = EVT_KBRD;
         key.code = ESCAPE;
         return key;
@@ -433,7 +433,7 @@ static struct keypress internal_borg_inkey(int flush_first)
     /* Check for user abort */
     (void)Term_inkey(&ch_evt, false, true);
 
-    /* Hack to keep him active in town. */
+    /* Keep him active in town */
     if (borg.trait[BI_CDEPTH] >= 1)
         borg.in_shop = false;
 
@@ -450,7 +450,7 @@ static struct keypress internal_borg_inkey(int flush_first)
         borg_note(format("# Key type was <%d><%c>", ch_evt.type, ch_evt.type));
         borg_oops("user abort");
 
-        /* Hack -- Escape */
+        /* Escape */
         key.code = ESCAPE;
         return key;
     }
@@ -483,7 +483,7 @@ static struct keypress internal_borg_inkey(int flush_first)
     while (!borg_think()) /* loop */
         ;
 
-    /* DVE- Update the status screen */
+    /* Update the status screen */
     borg_status();
 
     /* Save the local random info */
@@ -493,7 +493,7 @@ static struct keypress internal_borg_inkey(int flush_first)
     Rand_quick = borg_rand_quick;
     Rand_value = borg_rand_value;
 
-    /* Hack -- allow stepping to induce a clean cancel */
+    /* Allow stepping to induce a clean cancel */
     if (borg_step && (!--borg_step))
         borg_cancel = true;
 
@@ -509,7 +509,7 @@ static struct keypress internal_borg_inkey(int flush_first)
     /* Oops */
     borg_oops("normal abort");
 
-    /* Hack -- Escape */
+    /* Escape */
     key.code = ESCAPE;
     return key;
 }
@@ -526,7 +526,7 @@ static struct keypress borg_inkey_hack(int flush_first)
 
 
 /*
- * Hack -- interact with the "Ben Borg".
+ * Interact with the Borg
  */
 void do_cmd_borg(void)
 {
@@ -555,7 +555,7 @@ void do_cmd_borg(void)
 
 #endif /* BABLOS */
 
-    /* *HACK* set the player location */
+    /* Set the player location */
     borg.c = player->grid;
 
     /* Simple help */
@@ -569,51 +569,42 @@ void do_cmd_borg(void)
         Term_clear();
 
         i++;
-        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'z' activates the Borg.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'a' displays avoidances.");
         Term_putstr(42, i++, -1, COLOUR_WHITE, "Command 'u' updates the Borg.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command 'x' steps the Borg.");
-        Term_putstr(
-            42, i, -1, COLOUR_WHITE, "Command 'f' modifies the normal flags.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command 'c' modifies the cheat flags.");
-        Term_putstr(
-            42, i, -1, COLOUR_WHITE, "Command 'l' activates a log file.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command 's' activates search mode.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'i' displays grid info.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command 'g' displays grid feature.");
-        Term_putstr(
-            42, i, -1, COLOUR_WHITE, "Command 'a' displays avoidances.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command 'k' displays monster info.");
-        Term_putstr(
-            42, i, -1, COLOUR_WHITE, "Command 't' displays object info.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command '%' displays targeting flow.");
-        Term_putstr(
-            42, i, -1, COLOUR_WHITE, "Command '#' displays danger grid.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command '_' Regional Fear info.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'p' Borg Power.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command '1' change max depth.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command '2' level prep info.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command '3' Feature of grid.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command '!' Time.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command '@' Borg LOS.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'w' My Swap Weapon.");
-        Term_putstr(
-            2, i++, -1, COLOUR_WHITE, "Command 'q' Auto stop on level.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'v' Version stamp.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command 'd' Dump spell info.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'h' Borg_Has function.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command '$' Reload Borg.txt.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'y' Last 75 steps.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command 'm' money Scum.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command '^' Flow Pathway.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command 'R' Respawn Borg.");
-        Term_putstr(42, i, -1, COLOUR_WHITE, "Command 'o' Object Flags.");
-        Term_putstr(2, i++, -1, COLOUR_WHITE, "Command 'r' Restock Stores.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'c' toggle cheat flags.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command 'v' Version stamp.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'C' List nasties.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command 'w' My Swap Weapon.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'd' Dump spell info.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command 'x' steps the Borg.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'f' toggle flags.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command 'y' Last 75 steps.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'g' displays grid feature.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command 'z' activates the Borg.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'h' Borg_Has function.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '?' List Borg commands.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'i' displays grid info.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '!' Time.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'k' displays monster info.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '#' displays danger grid.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'l' creates snapshot log file.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '%' displays targeting flow.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'm' money Scum.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '$' Reload Borg.txt.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'o' Object Flags.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '@' Borg LOS.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'p' Borg Power.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '^' Flow Pathway.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'q' Auto stop on level.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '_' Regional Fear info.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'r' Restock Stores.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command ';' Display glyphs.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 'R' Respawn Borg.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '1' change max depth.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 's' activates search mode.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '2' level prep info.");
+        Term_putstr(2, i, -1, COLOUR_WHITE, "Command 't' displays object info.");
+        Term_putstr(42, i++, -1, COLOUR_WHITE, "Command '3' Feature of grid.");
 
         /* Prompt for key */
         msg("Commands: ");
@@ -627,7 +618,7 @@ void do_cmd_borg(void)
     }
 
     /*
-     * Hack -- force initialization or reinitialize if the game was closed
+     * Force initialization or reinitialize if the game was closed
      * and restarted without exiting since the last initialization
      */
     if (!borg_initialized || game_closed) {
@@ -648,7 +639,7 @@ void do_cmd_borg(void)
     switch (cmd) {
         /* Command: Nothing */
     case '$': {
-        /*** Hack -- initialize borg.ini options ***/
+        /*** Initialize borg.ini options ***/
         borg_init_txt_file();
         break;
     }
@@ -781,7 +772,7 @@ void do_cmd_borg(void)
             break;
         }
 
-        /* Stop when the borg wins */
+        /* lunal mode */
         case 'l':
         case 'L': {
             borg_cfg[BORG_LUNAL_MODE] = !borg_cfg[BORG_LUNAL_MODE];
@@ -1684,7 +1675,7 @@ void do_cmd_borg(void)
 
         break;
     }
-    /* Command:  HACK debug -- preparation for level */
+    /* Command: preparation for level */
     case '2': {
         int i = 0;
 
@@ -1925,7 +1916,7 @@ void do_cmd_borg(void)
     /* Version of the game */
     case 'v':
     case 'V': {
-        msg("APWBorg Version: %s", borg_engine_date);
+        msg("Borg Version: %s", borg_engine_date);
         break;
     }
     /* Command: Display all known info on item */
@@ -1993,8 +1984,8 @@ void do_cmd_borg(void)
             msg("Updating Shops... currently not allowed");
 #if false
             msg("Updating Shops...");
-            // need to change base code to make store_maint accessable .. trying not to change that too much right now.  
-            // this functionality seems a bit bogus anyway !FIX !TODO !AJG
+            // need to change base code to make store_maint accessible .. trying not to change that too much right now.  
+            // this functionality seems a bit bogus anyway !FIX !TODO
                             /* Maintain each shop (except home) */
             for (n = 0; n < MAX_STORES; n++) {
                 /* Skip the home */
