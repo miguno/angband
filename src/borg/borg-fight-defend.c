@@ -102,7 +102,7 @@ enum {
 /* Log the pathway and feature of the spell pathway
  * Useful for debugging beams and Tport Other spell
  */
-static void borg_log_spellpath(bool beam)
+static void borg_log_spellpath()
 {
     int n_x, n_y, x, y;
 
@@ -303,18 +303,24 @@ static int borg_defend_aux_speed(int p1)
 
     /* if scaryguy around cast it. */
     if (scaryguy_on_level) {
-        /* Pretend that it was scary and will be safer */
+        /* Further reduce danger to encourage speed use against scary or
+         * unique monsters.
+         */
         p2 = p2 * 3 / 10;
     }
 
     /* if we are fighting a unique cast it. */
     if (good_speed && borg_fighting_unique) {
-        /* Pretend that it was scary and will be safer */
+        /* Further reduce danger to encourage speed use against scary or
+         * unique monsters.
+         */
         p2 = p2 * 7 / 10;
     }
     /* if we are fighting a unique and a summoner cast it. */
     if (borg_fighting_summoner && borg_fighting_unique) {
-        /* Pretend that it was scary and will be safer */
+        /* Further reduce danger to encourage speed use against scary or
+         * unique monsters.
+         */
         p2 = p2 * 7 / 10;
     }
     /* if the unique is Sauron cast it */
@@ -1250,7 +1256,7 @@ static int borg_defend_aux_tele_away(int p1)
     }
 
     /* Log the Path for Debug */
-    borg_log_spellpath(true);
+    borg_log_spellpath();
 
     /* Log additional info for debug */
     for (i = 0; i < borg_tp_other_n; i++) {
@@ -3159,7 +3165,7 @@ static int borg_defend_aux_tele_away_morgoth(void)
         return (p2);
 
     /* Log the Path for Debug */
-    borg_log_spellpath(true);
+    borg_log_spellpath();
 
     /* Log additional info for debug */
     for (i = 0; i < borg_tp_other_n; i++) {

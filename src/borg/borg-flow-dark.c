@@ -42,9 +42,8 @@
  * or a visible trap, or an "unknown" grid.
  * or a non-perma-wall adjacent to a perma-wall. (GCV)
  *
- * b_stair is the index to the closest upstairs.
  */
-static bool borg_flow_dark_interesting(int y, int x, int b_stair)
+static bool borg_flow_dark_interesting(int y, int x)
 {
     int oy;
     int ox, i;
@@ -428,7 +427,7 @@ static void borg_flow_direct(int y, int x)
 }
 
 /*
- * Hack -- mark off the edges of a rectangle as "avoid" or "clear"
+ * Mark off the edges of a rectangle as "avoid" or "clear"
  */
 static void borg_flow_border(int y1, int x1, int y2, int x2, bool stop)
 {
@@ -467,7 +466,7 @@ static bool borg_flow_dark_1(int b_stair)
     int i;
     int x, y;
 
-    /* Hack -- not in town */
+    /* Not in town */
     if (!borg.trait[BI_CDEPTH])
         return false;
 
@@ -480,7 +479,7 @@ static bool borg_flow_dark_1(int b_stair)
         x = borg_light_x[i];
 
         /* Skip "boring" grids (assume reachable) */
-        if (!borg_flow_dark_interesting(y, x, b_stair))
+        if (!borg_flow_dark_interesting(y, x))
             continue;
 
         /* don't go too far from the stairs */
@@ -544,7 +543,7 @@ static bool borg_flow_dark_2(int b_stair)
 
     borg_grid *ag;
 
-    /* Hack -- not in town */
+    /* Not in town */
     if (!borg.trait[BI_CDEPTH])
         return false;
 
@@ -641,7 +640,7 @@ static bool borg_flow_dark_3(int b_stair)
 
     int x1, y1, x2, y2;
 
-    /* Hack -- not in town */
+    /* Not in town */
     if (!borg.trait[BI_CDEPTH])
         return false;
 
@@ -669,7 +668,7 @@ static bool borg_flow_dark_3(int b_stair)
         /* Examine the region */
         for (x = x1; x <= x2; x++) {
             /* Skip "boring" grids */
-            if (!borg_flow_dark_interesting(y, x, b_stair))
+            if (!borg_flow_dark_interesting(y, x))
                 continue;
 
             /* Skip "unreachable" grids */
@@ -740,13 +739,13 @@ static bool borg_flow_dark_4(int b_stair)
 {
     int i, x, y;
     int x1, y1, x2, y2;
-    int leash = 250;
+    int leash = borg_get_leash(false);
 
-    /* Hack -- not in town */
+    /* Not in town */
     if (!borg.trait[BI_CDEPTH])
         return false;
 
-    /* Hack -- Not if a vault is on the level */
+    /* Not if a vault is on the level */
     if (vault_on_level)
         return false;
 
@@ -769,16 +768,12 @@ static bool borg_flow_dark_4(int b_stair)
     /* Nothing yet */
     borg_temp_n = 0;
 
-    /* check the leash length */
-    if (borg.trait[BI_CDEPTH] >= borg.trait[BI_CLEVEL] - 5)
-        leash = borg.trait[BI_CLEVEL] * 3 + 9;
-
     /* Examine the panel */
     for (y = y1; y <= y2; y++) {
         /* Examine the panel */
         for (x = x1; x <= x2; x++) {
             /* Skip "boring" grids */
-            if (!borg_flow_dark_interesting(y, x, b_stair))
+            if (!borg_flow_dark_interesting(y, x))
                 continue;
 
             /* Skip "unreachable" grids */
@@ -855,24 +850,20 @@ static bool borg_flow_dark_4(int b_stair)
 static bool borg_flow_dark_5(int b_stair)
 {
     int i, x, y;
-    int leash = 250;
+    int leash = borg_get_leash(false);
 
-    /* Hack -- not in town */
+    /* Not in town */
     if (!borg.trait[BI_CDEPTH])
         return false;
 
     /* Nothing yet */
     borg_temp_n = 0;
 
-    /* check the leash length */
-    if (borg.trait[BI_CDEPTH] >= borg.trait[BI_CLEVEL] - 5)
-        leash = borg.trait[BI_CLEVEL] * 3 + 9;
-
     /* Examine every "legal" grid */
     for (y = 1; y < AUTO_MAX_Y - 1; y++) {
         for (x = 1; x < AUTO_MAX_X - 1; x++) {
             /* Skip "boring" grids */
-            if (!borg_flow_dark_interesting(y, x, b_stair))
+            if (!borg_flow_dark_interesting(y, x))
                 continue;
 
             /* Skip "unreachable" grids */
@@ -890,7 +881,7 @@ static bool borg_flow_dark_5(int b_stair)
 
             /* Paranoia -- Check for overflow */
             if (borg_temp_n == AUTO_TEMP_MAX) {
-                /* Hack -- Double break */
+                /* Double break */
                 y = AUTO_MAX_Y;
                 x = AUTO_MAX_X;
                 break;
@@ -960,7 +951,7 @@ bool borg_flow_dark(bool neer)
         return false;
 
     /* Paranoia */
-    if (borg_flow_dark_interesting(borg.c.y, borg.c.x, -1)) {
+    if (borg_flow_dark_interesting(borg.c.y, borg.c.x)) {
         return false;
     }
 

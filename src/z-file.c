@@ -218,28 +218,6 @@ size_t path_build(char *buf, size_t len, const char *base, const char *leaf)
 	return cur_len;
 }
 
-/**
- * Converts path_in to an absolute path without redundant path separators.
- *
- * \param buf is the buffer to hold the result.  If len is greater than zero,
- * it will always be null terminated.  buf may be NULL if len is zero.
- * \param len is the size of the buffer.
- * \param path_in is the null-terminated string with the path to normalize.
- * \param trailing_sep will, if true, cause the normalized path to have a
- * trailing path separator if it does not already have one.
- * \param req_len if not NULL, will be dereferenced and set to the required
- * buffer size needed to hold the normalized result or to zero if it was not
- * possible to compute the normalized result.
- * \param root_len if not NULL, will be dereferenced and set to the length
- * of the root portion (the part that will always remain after repeatedly
- * going up the directory tree) of the path or to zero if it was not possible
- * to compute the normalized result.
- * \return zero if the normalization operation succeeded and the untruncated
- * result was stored in buf.  Returns 1 if the normalized result was
- * truncated.  Returns 2 if the normalized result could not be determined.
- *
- * On Unixes, deals with the tilde as representing home directories.
- */
 int path_normalize(char *buf, size_t len, const char *path_in,
 		bool trailing_sep, size_t *req_len, size_t *root_len)
 {
@@ -1161,8 +1139,10 @@ bool file_write(ang_file *f, const char *buf, size_t n)
 /**
  * Read a line of text from file 'f' into buffer 'buf' of size 'n' bytes.
  *
- * Support both \r\n and \n as line endings, but not the outdated \r that used
- * to be used on Macs.  Replace non-printables with '?', and \ts with ' '.
+ * Accepts carriage return + new line (ASCII 0xd + ASCII 0xa),
+ * new line (ASCII 0xa), or carriage return (ASCII 0xa) as line endings.
+ * Replaces any tab with one to TAB_COLUMNS spaces (i.e. the number of spaces
+ * to move the offset within the string to the next multiple of TAB_COLUMNS).
  */
 #define TAB_COLUMNS 4
 

@@ -1510,24 +1510,28 @@ static void borg_notice_equipment(void)
         /* Boost might */
         extra_might += item->modifiers[OBJ_MOD_MIGHT];
 
-        /* Item makes player glow or has a light radius  */
-        borg.trait[BI_LIGHT] += item->modifiers[OBJ_MOD_LIGHT];
 
-        /* LIGHT_2 and LIGHT_3 */
-        if (of_has(item->flags, OF_LIGHT_2)) {
-            borg.trait[BI_LIGHT] += 2;
-        } else if (of_has(item->flags, OF_LIGHT_3)) {
-            borg.trait[BI_LIGHT] += 3;
-        }
-
-        /* people with "unlight" can use radius 1 light artifacts */
-        if ((item->modifiers[OBJ_MOD_LIGHT] > 0) 
-            && (borg.trait[BI_CLASS] == CLASS_NECROMANCER))
-            borg.trait[BI_LIGHT]--;
- 
-        /* Light from items with no fuel don't count  */
-        if (i == INVEN_LIGHT && (item->timeout || of_has(item->flags, OF_NO_FUEL)))
+        if (i != INVEN_LIGHT ||
+            of_has(borg_items[i].flags, OF_NO_FUEL)
+            || item->timeout != 0) {
+            /* Item makes player glow or has a light radius  */
             borg.trait[BI_LIGHT] += item->modifiers[OBJ_MOD_LIGHT];
+
+            /* LIGHT_2 and LIGHT_3 */
+            if (of_has(item->flags, OF_LIGHT_2)) {
+                borg.trait[BI_LIGHT] += 2;
+            }
+            else if (of_has(item->flags, OF_LIGHT_3)) {
+                borg.trait[BI_LIGHT] += 3;
+            }
+
+            /* people with "unlight" can use radius 1 light artifacts */
+            if ((item->modifiers[OBJ_MOD_LIGHT] > 0)
+                && (borg.trait[BI_CLASS] == CLASS_NECROMANCER))
+                borg.trait[BI_LIGHT]--;
+
+            borg.trait[BI_LIGHT] += item->modifiers[OBJ_MOD_LIGHT];
+        }
 
         /* Boost mod moves */
         borg.trait[BI_MOD_MOVES] += item->modifiers[OBJ_MOD_MOVES];
@@ -1727,7 +1731,7 @@ static void borg_notice_equipment(void)
         if (bonuses > 2)
             borg.trait[BI_MULTIPLE_BONUSES] += bonuses;
 
-        /* Net-zero The borg will miss read acid damaged items such as
+        /* HACK: Net-zero The borg will miss read acid damaged items such as
          * Leather Gloves [2,-2] and falsely assume they help his power.
          * this hack rewrites the bonus to an extremely negative value
          * thus encouraging him to remove the non-helpful-non-harmful but
@@ -2956,7 +2960,7 @@ void borg_notice_player(void)
 {
     int i;
 
-    /*** Extract class ***/
+    /*** Extract class Cheat ***/
     borg.trait[BI_CLASS] = player->class->cidx;
 
     /* Assume level is fine */
@@ -3122,13 +3126,13 @@ void borg_notice_player(void)
         borg.trait[BI_CSTR + i] = player->stat_cur[STAT_STR + i];
     }
 
-    /* Access max depth */
+    /* Access depth Cheat */
     borg.trait[BI_CDEPTH] = player->depth;
 
-    /* Access max depth */
+    /* Access max depth Cheat */
     borg.trait[BI_MAXDEPTH] = player->max_depth;
 
-    /* Track if Sauron is dead */
+    /* Track if Sauron is dead Cheat */
     borg.trait[BI_SAURON_DEAD] = borg_race_death[borg_sauron_id];
 }
 

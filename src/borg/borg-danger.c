@@ -553,7 +553,7 @@ static int borg_danger_physical(int i, bool full_damage)
  * We reduce the danger if the monster is immobile or not LOS
  */
 static int borg_danger_spell(
-    int i, int y, int x, int d, bool average, bool full_damage)
+    int i, int y, int x, int d, bool average)
 {
     int q, n = 0, pfe = 0, glyph = 0, glyph_check = 0;
 
@@ -2397,10 +2397,13 @@ int borg_danger_one_kill(
     /* Physical attacks */
     v1 = borg_danger_physical(i, full_damage);
 
-    /* Under Stressful Situation.
+    /* If the Borg has been stuck on this panel for a long time, or if the
+     * total turn count is very high, reduce the danger value. This helps
+     * prevent the Borg from getting stuck due to overestimating danger and
+     * refusing to move in both this area of the dungeon and over the course
+     * of the game.
      */
     if (borg.time_this_panel > 1200 || borg_t > 25000) {
-        /* he might be stuck and could overflow */
         v1 = v1 / 5;
     }
 
@@ -2585,7 +2588,7 @@ int borg_danger_one_kill(
     }
 
     /** Ranged Attacks **/
-    v2 = borg_danger_spell(i, y, x, d, average, full_damage);
+    v2 = borg_danger_spell(i, y, x, d, average);
 
     /* Never cast spells */
     if (!r_ptr->freq_innate && !r_ptr->freq_spell) {
@@ -2681,10 +2684,13 @@ int borg_danger_one_kill(
         v2 = b_v2;
     }
 
-    /* Under Stressful Situation.
+    /* If the Borg has been stuck on this panel for a long time, or if the
+     * total turn count is very high, reduce the danger value. This helps
+     * prevent the Borg from getting stuck due to overestimating danger and
+     * refusing to move in both this area of the dungeon and over the course
+     * of the game.
      */
     if (borg.time_this_panel > 1200 || borg_t > 25000) {
-        /* he might be stuck and could overflow */
         v2 = v2 / 5;
     }
 

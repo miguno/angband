@@ -250,7 +250,7 @@ bool borg_drop_junk(void)
     int     i, b_i = -1;
     bool    fix = false;
     int32_t p, b_p = borg.power;
-    int32_t value;
+    int32_t value = 0;
 
     /* No need */
     if (!borg_do_crush_junk)
@@ -1159,7 +1159,10 @@ bool borg_dump_quiver(void)
 
     borg_item *item;
 
-    /* Prevent the swap till you drop loop */
+    /* Prevents swap loops when hungry or weak. This is a workaround for a
+     * deeper bug where the Borg may swap items back and forth due to power
+     * calculation issues and ultimately die from hunger.
+     */
     if (borg.trait[BI_ISHUNGRY] || borg.trait[BI_ISWEAK])
         return false;
 
@@ -1270,7 +1273,10 @@ bool borg_remove_stuff(void)
     if (hole == -1)
         return false;
 
-    /* Prevent the swap till you drop loop */
+    /* Prevents swap loops when hungry or weak. This is a workaround for a
+     * deeper bug where the Borg may swap items back and forth due to power
+     * calculation issues and ultimately die from hunger.
+     */
     if (borg.trait[BI_ISHUNGRY] || borg.trait[BI_ISWEAK])
         return false;
 

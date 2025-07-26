@@ -136,7 +136,7 @@ void borg_formula_error(const char *section, const char *full_line,
  *    depth(nnn)
  * this should return the nnn as a number and -1 if it fails
  */
-static int parse_depth(char *line, const char *full_line)
+static int parse_depth(char *line)
 {
     line = strchr(line, '(');
     if (!line)
@@ -625,7 +625,7 @@ static bool parse_depth_line(bool restock, char *line, const char *full_line)
 
     if (s_depth) {
         if (!fail) {
-            d->dlevel = parse_depth(s_depth, full_line);
+            d->dlevel = parse_depth(s_depth);
             if (d->dlevel < 0) {
                 borg_formula_error(start, full_line, "value",
                     "** depth section can't be parsed");
@@ -859,7 +859,7 @@ int32_t borg_power_dynamic(void)
     /* Determine the weight allowance */
     int max_wgt = player->class->magic.spell_weight;
 
-    /* Hack -- heavy armor hurts magic */
+    /* HACK: Heavy armor hurts magic */
     if (borg_can_cast() && ((cur_wgt - max_wgt) / 10) > 0) {
         /* max sp must be calculated in case it changed with the armor */
         int max_sp = borg.trait[BI_SP_ADJ] / 100 + 1;
@@ -885,7 +885,7 @@ int32_t borg_power_dynamic(void)
         && borg.trait[BI_ADIGGER] == 1)
         total += 5000L;
 
-    /*** Hack -- books ***/
+    /*** HACK: Books ***/
     /*   Reward books    */
     for (int book = 0; book < 9; book++) {
         /* No copies */
@@ -933,7 +933,7 @@ int32_t borg_power_dynamic(void)
                 /* if (as->power < mana) mana = as->power; */
             }
 
-            /* Hack -- Ignore "difficult" normal books */
+            /* HACK: Ignore "difficult" normal books */
             if ((when > 5) && (when >= borg.trait[BI_MAXCLEVEL] + 2))
                 continue;
             /* if (mana > borg.trait[BI_MAXSP]) continue; */
@@ -948,7 +948,7 @@ int32_t borg_power_dynamic(void)
         }
     }
 
-    /*  Hack -- Apply "encumbrance" from weight */
+    /* HACK: Apply "encumbrance" from weight */
 
     /* XXX XXX XXX Apply "encumbrance" from weight */
     if (borg.trait[BI_WEIGHT] > borg.trait[BI_CARRY] / 2) {

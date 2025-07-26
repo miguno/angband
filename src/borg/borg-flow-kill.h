@@ -75,12 +75,12 @@ extern int16_t    borg_kills_nxt;
 extern borg_kill *borg_kills;
 
 /*
- * Hack -- count racial appearances per level
+ * Count racial appearances per level
  */
 extern int16_t *borg_race_count;
 
 /*
- * Hack -- count racial kills (for uniques)
+ * Count racial kills (for uniques)
  */
 extern int16_t *borg_race_death;
 
@@ -167,12 +167,12 @@ extern bool borg_flow_kill_aim(bool viewable);
 /*
  * Dig an anti-summon corridor.
  */
-extern bool borg_flow_kill_corridor(bool viewable);
+extern bool borg_flow_kill_corridor(void);
 
 /*
  * Dig a straight Tunnel to a close monster
  */
-extern bool borg_flow_kill_direct(bool viewable, bool twitchy);
+extern bool borg_flow_kill_direct(bool twitchy);
 
 /*
  * Check if a dangerous monster is nearby

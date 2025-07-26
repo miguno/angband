@@ -67,6 +67,7 @@ src/angband-master
 src/autoconf.h
 src/autoconf.h.in
 src/config
+src/doc/_doxygen/
 src/stats/db.dep
 src/tests/ran-already
 src/version.h

@@ -193,7 +193,7 @@ int project_path(struct chunk *c, struct loc *gp, int range, struct loc grid1,
 			/* Save grid */
 			gp[n++] = loc(x, y);
 
-			/* Hack -- Check maximum range */
+			/* Check maximum range */
 			if ((n + (k >> 1)) >= range) break;
 
 			/* Sometimes stop at finish grid */
@@ -258,7 +258,7 @@ int project_path(struct chunk *c, struct loc *gp, int range, struct loc grid1,
 			/* Save grid */
 			gp[n++] = loc(x, y);
 
-			/* Hack -- Check maximum range */
+			/* Check maximum range */
 			if ((n + (k >> 1)) >= range) break;
 
 			/* Sometimes stop at finish grid */
@@ -317,7 +317,7 @@ int project_path(struct chunk *c, struct loc *gp, int range, struct loc grid1,
 			/* Save grid */
 			gp[n++] = loc(x, y);
 
-			/* Hack -- Check maximum range */
+			/* Check maximum range */
 			if ((n + (n >> 1)) >= range) break;
 
 			/* Sometimes stop at finish grid */
@@ -435,8 +435,7 @@ struct loc origin_get_loc(struct source origin)
  *   \param origin Origin of the projection
  *   \param rad Radius of explosion (0 = beam/bolt, 1 to 20 = ball), or maximum
  *	  length of arc from the source.
- *   \param y Target location (or location to travel towards)
- *   \param x Target location (or location to travel towards)
+ *   \param finish Target location (or location to travel towards)
  *   \param dam Base damage to apply to monsters, terrain, objects, or player
  *   \param typ Type of projection (fire, frost, dispel demons etc.)
  *   \param flg Extra bit flags that control projection behavior
@@ -565,9 +564,9 @@ struct loc origin_get_loc(struct source origin)
  * projection path.  Note that in general, the player will *always* see part
  * of the path, since it either starts at the player or ends on the player.
  *
- * Hack -- we assume that every "projection" is "self-illuminating".
+ * We assume that every "projection" is "self-illuminating".
  *
- * Hack -- when only a single monster is affected, we automatically track
+ * When only a single monster is affected, we automatically track
  * (and recall) that monster, unless "PROJECT_JUMP" is used.
  *
  * Note that we must call "handle_stuff()" after affecting terrain features
@@ -691,7 +690,7 @@ bool project(struct source origin, int rad, struct loc finish,
 				int ny = path_grid[i].y;
 				int nx = path_grid[i].x;
 
-				/* Hack -- Balls explode before reaching walls. */
+				/* Balls explode before reaching walls. */
 				if (!square_ispassable(cave, path_grid[i]) && (rad > 0) &&
 					!(flg & (PROJECT_BEAM)))
 					break;
