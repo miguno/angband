@@ -1487,19 +1487,17 @@ static int dir_transitions[10][10] =
 };
 
 /**
- * Request a "movement" direction (1,2,3,4,6,7,8,9) from the user.
+ * Request a "movement" direction (1,2,3,4,5(optional),6,7,8,9) from the user.
  *
  * Return true if a direction was chosen, otherwise return false.
  *
  * This function should be used for all "repeatable" commands, such as
  * run, walk, open, close, bash, disarm, spike, tunnel, etc, as well
- * as all commands which must reference a grid adjacent to the player,
- * and which may not reference the grid under the player.
+ * as all commands which must reference a grid adjacent to the player.
+ * If the command does not allow the grid under the player, pass false
+ * for allow_5.  Otherwise, use true for allow_5.
  *
- * Directions "5" and "0" are illegal and will not be accepted.
- *
- * This function tracks and uses the "global direction", and uses
- * that as the "desired direction", if it is set.
+ * The direction, "0", is illegal and will not be accepted.
  */
 static bool textui_get_rep_dir(int *dp, bool allow_5)
 {
@@ -1525,7 +1523,7 @@ static bool textui_get_rep_dir(int *dp, bool allow_5)
 
 		if (ke.type == EVT_NONE ||
 				(ke.type == EVT_KBRD
-				&& !target_dir_allow(ke.key, allow_5))) {
+				&& !target_dir_allow(ke.key, allow_5, true))) {
 			prt("Direction or <click> (Escape to cancel)? ", 0, 0);
 			ke = inkey_ex();
 		}
@@ -1560,10 +1558,17 @@ static bool textui_get_rep_dir(int *dp, bool allow_5)
 
 				/* XXX Ideally show and move the cursor here to indicate
 				 the currently "Pending" direction. XXX */
-				this_dir = target_dir_allow(ke.key, allow_5);
+				this_dir = target_dir_allow(ke.key, allow_5,
+					true);
 
-				if (this_dir)
+				if (this_dir == ESCAPE) {
+					/* Clear the prompt */
+					prt("", 0, 0);
+
+					return (false);
+				} else if (this_dir) {
 					dir = dir_transitions[dir][this_dir];
+				}
 
 				if (player->opts.lazymove_delay == 0 || ++keypresses_handled > 1)
 					break;
@@ -1675,8 +1680,12 @@ static bool textui_get_aim_dir(int *dp)
 
 					/* XXX Ideally show and move the cursor here to indicate
 					 * the currently "Pending" direction. XXX */
-					this_dir = target_dir(ke.key);
+					this_dir = target_dir_allow(ke.key,
+						false, true);
 
+					if (this_dir == ESCAPE) {
+						return false;
+					}
 					if (this_dir) {
 						dir = dir_transitions[dir][this_dir];
 					} else {

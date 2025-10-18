@@ -117,14 +117,15 @@ can optionally build (GCU, SDL, SDL2, and X11) using arguments to configure
 such as --enable-sdl, --disable-x11, etc. Each front end has different
 dependencies (e.g. ncurses, SDL libraries, etc).
 
-If your source files are from rephial.org, from a "Source code" link on the
-github releases page, or from cloning the git repository, you'll first need to
-run this to create the configure script::
+Some sets of source code (e.g. downloads from Rephial.org) will contain a
+"configure" script in the root directory of the unpacked files, while other
+filesets (e.g. the "Source code (tar.gz)" links on the Releases pages) 
+will not contain the "configure" script.
+
+If the code you download doesn't contain the "configure" script, then you'll
+first need to run the following command to create that script::
 
     ./autogen.sh
-
-That is not necessary for source files that are from the github releases page
-but not from a "Source code" link on that page.
 
 To build Angband to be run in-place, then run this::
 
@@ -405,6 +406,33 @@ If you only want the unit tests while using CMake, it's a little simpler::
     cmake ..
     make allunittests
 
+There is some support for measuring how well the test cases cover the code.
+If you use configure and have gcc, gcov, and perl, you can run this in src
+directory after running configure::
+
+    make coverage
+
+That cleans the directories (removing object files, intermediates generated
+for code coverage, and coverage reports), rebuilds the game with code coverage
+profiling enabled, runs the unit tests, generates coverage reports for
+individual source files (*.gcov in the src directory), and then writes a
+summary of those reports to standard output.  The gen-coverage Perl script in
+the src directory is what is used to generate the summary.
+
+If you use CMake, have perl, and have either gcc and gcov or clang and
+llvm-cov, then you can configure code coverage support by including
+-DSUPPORT_COVERAGE=ON in the options to cmake.  That adds three targets for
+manipulating coverage results.  "make reportcoverage" generates per-file
+coverage reports (*.gcov in the directory where you are building) using
+the current accumulated coverage data and then writes a summary of those
+reports to standard output.  The gen-coverage Perl script in the src directory
+is what is used to generate the summary.  "make resetcoverage" removes the
+accumulated coverage data (*.gcda files) and any per-file coverage reports.
+"make coverage" is equivalent to "make resetcoverage; make alltests;
+make reportcverage":  clear accumulated coverage information, run the unit
+tests (and, if -DSUPPORT_TEST_FRONTEND=ON was supplied to cmake, the end-to-end
+tests), and then report the coverage results.
+
 Statistics build
 ~~~~~~~~~~~~~~~~
 
@@ -646,9 +674,9 @@ To create the angband.zip distribution
 
 	make -f Makefile.ibm dist
 
-Documentation
--------------
-To convert the documentation from restructured text to the desired output
+User Documentation
+------------------
+To convert the user manual from restructured text to the desired output
 format, you'll need Sphinx ( https://www.sphinx-doc.org/en/master/ )
 and, unless you change the theme in the documentation configuration, the
 sphinx-better-theme ( https://pypi.org/project/sphinx-better-theme/ ; which
@@ -658,8 +686,33 @@ can be installed via pip using::
 
 ).
 
-With those utilities in place and sphinx-build in your path, you can perform
-the conversion by running::
+If you are using configure, you can tell it to build the manual in HTML by
+including ``--with-sphinx`` in the options to configure.  If you want to
+override the default theme, specify the theme's name in the DOC_HTML_THEME
+variable.  For instance, running this at the top level of the distribution::
+
+        ./configure --with-no-install --with-sphinx DOC_HTML_THEME=alabaster
+
+would use one of the themes always included with Sphinx and avoid the need
+to install the sphinx-better-theme.  When running make or ``make manual``
+after configure has been set up to generate the user manual, the result
+will appear in docs/_build/html.
+
+If you are using CMake, you can tell it to build the manual in HTML by including
+``-DBUILD_DOC=ON``  in the options to CMake.  If you want to override the
+default theme, specify the theme's name in the DOC_HTML_THEME variable.  For
+instance running this at the top level of the distribution::
+
+        mkdir build
+        cd build
+        cmake -DBUILD_DOC=ON -DDOC_HTML_THEME=alabaster ..
+
+would behave much like the earlier example using configure.  After building
+with CMake (i.e. ``cmake --build .`` or ``cmake --build . -t OurManual``), the
+generated user manual will be in manual-output-html in the build directory.
+
+To build the user manual without configure or CMake, make sure sphinx-build
+is in your path and then run::
 
 	make html
 
@@ -673,3 +726,14 @@ Other output formats besides HTML are possible.  Run::
 
 without any arguments in the docs subdirectory to see the formats that Sphinx
 can generate.
+
+Developer Documentation
+-----------------------
+
+To extract documentation from comments in the source code, you will need
+doxygen, https://www.doxygen.nl .  Then you can run this in the top level
+directory of the distribution::
+
+        doxygen src/doc/doxygen.conf
+
+to assemble the documentation and place it in src/doc/_doxygen .

@@ -1684,6 +1684,9 @@ int borg_launch_bolt(int rad, int dam, int typ, int max, int ammo_location)
     int o_y = 0, o_x = 0;
     int d, b_d       = z_info->max_range;
 
+    bool require_monster = false;
+
+
     /* Examine possible destinations */
 
     /* This will allow the borg to target places adjacent to a monster
@@ -1792,8 +1795,12 @@ int borg_launch_bolt(int rad, int dam, int typ, int max, int ammo_location)
     borg.goal.g.x = borg_temp_x[b_i] + b_o_x;
     borg.goal.g.y = borg_temp_y[b_i] + b_o_y;
 
+    /* will need to add SINGLE COMBAT and COMMAND if those end up coded */
+    if (typ == BORG_ATTACK_CURSE)
+        require_monster = true;
+
     /* Target the location */
-    (void)borg_target(borg.goal.g);
+    (void)borg_target(borg.goal.g, require_monster);
 
     /* Result */
     return b_n;
@@ -2052,7 +2059,7 @@ static int borg_launch_arc(int degrees, int dam, int typ, int max)
     borg.goal.g.y = borg_temp_y[b_i] + b_o_y;
 
     /* Target the location */
-    (void)borg_target(borg.goal.g);
+    (void)borg_target(borg.goal.g, false);
 
     /* Result */
     return b_n;
@@ -2940,6 +2947,8 @@ static int borg_attack_aux_wand_bolt_unknown(int dam, int typ)
     /* Use target */
     borg_keypress('5');
 
+    borg.trying_unknown = true;
+
     /* Set our shooting flag */
     successful_target = -1;
 
@@ -3012,6 +3021,8 @@ static int borg_attack_aux_rod_bolt_unknown(int dam, int typ)
 
     /* Set our shooting flag */
     successful_target = -1;
+
+    borg.trying_unknown = true;
 
     /* Value */
     return b_n;
@@ -3356,7 +3367,7 @@ static int borg_attack_aux_leap_into_battle(void)
         format("# Attacking with weapon '%s'", borg_items[INVEN_WIELD].desc));
 
     /* Attack the grid */
-    borg_target(borg.goal.g);
+    borg_target(borg.goal.g, true);
     borg_spell(LEAP_INTO_BATTLE);
 
     /* Use target */
@@ -3378,7 +3389,7 @@ static int borg_attack_aux_maim_foe(void)
     int p, dir;
 
     int i, b_i = -1;
-    int d, b_d = -1;
+    int d = -1, b_d = -1;
 
     borg_grid *ag;
 
@@ -3487,7 +3498,7 @@ static int borg_attack_aux_vampire_strike(void)
 
     int  i, b_i = -1;
     int  d;
-    int  dist, best_dist = z_info->max_range;
+    int  dist = 0, best_dist = z_info->max_range;
     int  o_x, o_y, x2, y2;
     int  x = 0, y = 0;
 

@@ -102,7 +102,7 @@ enum {
 /* Log the pathway and feature of the spell pathway
  * Useful for debugging beams and Tport Other spell
  */
-static void borg_log_spellpath()
+static void borg_log_spellpath(void)
 {
     int n_x, n_y, x, y;
 
@@ -3419,7 +3419,7 @@ static int borg_defend_aux_light_morgoth(void)
         "# Attempting to Illuminate a Pathway to (%d, %d)", best.y, best.x));
 
     /* Target Morgoth Grid */
-    (void)borg_target(best);
+    (void)borg_target(best, false);
 
     /* Cast the spell */
     if (borg_spell(SPEAR_OF_LIGHT) || borg_spell(CLAIRVOYANCE)

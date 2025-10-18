@@ -812,18 +812,12 @@ void store_stock_list(struct store *store, struct object **list, int n)
  */
 static void store_object_absorb(struct object *old, struct object *new)
 {
-	int total = old->number + new->number;
-
 	/* Combine quantity, lose excess items */
-	old->number = MIN(total, old->kind->base->max_stack);
+	int change = (old->number < old->kind->base->max_stack) ?
+		MIN(new->number, old->kind->base->max_stack - old->number) : 0;
 
-	/* If rods are stacking, add the charging timeouts */
-	if (tval_can_have_timeout(old))
-		old->timeout += new->timeout;
-
-	/* If wands/staves are stacking, combine the charges */
-	if (tval_can_have_charges(old))
-		old->pval += new->pval;
+	distribute_charges(new, old, change, false);
+	old->number += change;
 
 	object_origin_combine(old, new);
 
@@ -883,6 +877,8 @@ void home_carry(struct object *obj)
 		/* The home acts just like the player */
 		if (object_mergeable(temp_obj, obj, OSTACK_PACK)) {
 			/* Save the new number of items */
+			object_absorb(temp_obj->known, obj->known);
+			obj->known = NULL;
 			object_absorb(temp_obj, obj);
 			return;
 		}
@@ -1818,12 +1814,24 @@ void do_cmd_retrieve(struct command *cmd)
 	}
 
 	/* Distribute charges of wands, staves, or rods */
-	distribute_charges(obj, picked_item, amt);
+	distribute_charges(obj, picked_item, amt, true);
 
 	/* Make a known object */
 	known_obj = object_new();
-	object_copy(known_obj, obj->known);
+	/*
+	 * Have at least one save,
+	 * https://github.com/angband/angband/issues/6362 , where
+	 * obj->known->number does not agree with obj->number.  Coerce
+	 * obj->known->number so it is usable in object_copy_amt() and
+	 * distribute_charges().  It may be possible to drop that coercion if
+	 * the source of the misaligned numbers is fixed and compatibility
+	 * with old saves which may have misaligned numbers is no longer
+	 * required.
+	 */
+	obj->known->number = obj->number;
+	object_copy_amt(known_obj, obj->known, amt);
 	picked_item->known = known_obj;
+	distribute_charges(obj->known, picked_item->known, amt, true);
 
 	/* Give it to the player */
 	inven_carry(player, picked_item, true, true);
@@ -2013,7 +2021,7 @@ void do_cmd_stash(struct command *cmd)
 		return;
 
 	/* Check we are somewhere we can stash items. */
-	if (store->feat != FEAT_HOME) {
+	if (!store || store->feat != FEAT_HOME) {
 		msg("You are not in your home.");
 		return;
 	}

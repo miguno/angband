@@ -43,6 +43,7 @@ static struct menu *effect_menu_new(struct effect *effect, int count,
 	char buf[80];
 
 	m->selections = all_letters_nohjkl;
+	m->flags = MN_KEYMAP_ESC;
 
 	/* Collect a string for each effect. */
 	if (count > 0) {
@@ -82,8 +83,10 @@ static struct menu *effect_menu_new(struct effect *effect, int count,
 		++ms_count;
 		effect = effect_next(effect);
 	}
-	/* Set the sentinel element. */
-	ms[ms_count] = NULL;
+	if (count > 0) {
+		/* Set the sentinel element. */
+		ms[ms_count] = NULL;
+	}
 
 	menu_setpriv(m, ms_count, ms);
 

@@ -138,8 +138,8 @@ bool borg_can_dig(bool check_fail, uint8_t feat)
     int dig_check = feat == FEAT_GRANITE ? BORG_DIG_HARD : BORG_DIG;
 
     /* try digging even if it is hard when out of moves */
-    if (borg.times_twitch > 21)
-        dig_check -= 20;
+    if (borg.times_twitch > 10)
+        dig_check -= (borg.times_twitch - 10);
 
     if ((weapon_swap && borg.trait[BI_DIG] >= dig_check
             && borg_items[weapon_swap - 1].tval == TV_DIGGING)
@@ -833,7 +833,7 @@ static bool borg_play_step(int y2, int x2)
             if (distance(loc(take->x, take->y), borg.c) == 1) {
                 if (borg_spell_okay_fail(ORB_OF_DRAINING, 25)) {
                     /* Target the Take location */
-                    borg_target(loc(take->x, take->y));
+                    borg_target(loc(take->x, take->y), false);
 
                     /* Cast the prayer */
                     borg_spell(ORB_OF_DRAINING);
@@ -908,7 +908,7 @@ static bool borg_play_step(int y2, int x2)
             borg.no_rest_prep = 3000;
 
             /* the activation needs to target the trap */
-            borg_target(borg.goal.g);
+            borg_target(borg.goal.g, false);
             return true;
         }
 
