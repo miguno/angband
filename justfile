@@ -17,6 +17,13 @@ system-info:
     @echo "os: {{os()}}"
     @echo "os family: {{os_family()}}"
 
+# build console Linux binary
+[group('development')]
+build-linux-console:
+    (cd src && make -f Makefile.std clean install) || exit 1
+    @echo
+    @echo "Run the 'angband' binary in the top-level project folder."
+
 # build console macOS binary with ncurses support
 [group('development')]
 build-macos-console:
@@ -31,12 +38,20 @@ build-macos-app:
     @echo
     @echo "Run the game via 'Angband.app' in the top-level project folder"
 
-# run Angband as console macOS binary (ASCII mode)
+# run Angband as console binary (ASCII mode)
 [group('app')]
-run-macos-console:
+run-console:
     # Options are explained at
     # https://github.com/angband/angband/blob/e723430/src/main-gcu.c#L1465-L1491
     ./angband -mgcu -- -n6 -right "60x27,*" -bottom "*x12"
+
+# run Angband as console Linux binary (ASCII mode)
+[group('app')]
+run-linux-console: run-console
+
+# run Angband as console macOS binary (ASCII mode)
+[group('app')]
+run-macos-console: run-console
 
 # run Angband as a native macOS app
 [group('app')]
