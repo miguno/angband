@@ -1,24 +1,21 @@
-MACRO(CONFIGURE_SDL_FRONTEND _NAME_TARGET)
+macro(configure_sdl_frontend _NAME_TARGET)
 
-    FIND_PACKAGE(SDL)
-    FIND_PACKAGE(SDL_ttf)
-    FIND_PACKAGE(SDL_image)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL QUIET IMPORTED_TARGET sdl)
+    pkg_check_modules(SDL_TTF QUIET IMPORTED_TARGET SDL_ttf)
+    pkg_check_modules(SDL_IMAGE QUIET IMPORTED_TARGET SDL_image)
 
-    IF(SDL_FOUND AND SDL_TTF_FOUND AND SDL_IMAGE_FOUND)
+    if(SDL_FOUND AND SDL_TTF_FOUND AND SDL_IMAGE_FOUND)
 
-        TARGET_LINK_LIBRARIES(${_NAME_TARGET} PRIVATE ${SDL_LIBRARY})
-        TARGET_LINK_LIBRARIES(${_NAME_TARGET} PRIVATE ${SDL_TTF_LIBRARIES})
-        TARGET_LINK_LIBRARIES(${_NAME_TARGET} PRIVATE ${SDL_IMAGE_LIBRARIES})
-        TARGET_INCLUDE_DIRECTORIES(${_NAME_TARGET} PRIVATE ${SDL_INCLUDE_DIR})
-        TARGET_INCLUDE_DIRECTORIES(${_NAME_TARGET} PRIVATE ${SDL_TTF_INCLUDE_DIRS})
-        TARGET_INCLUDE_DIRECTORIES(${_NAME_TARGET} PRIVATE ${SDL_IMAGE_INCLUDE_DIRS})
-        TARGET_COMPILE_DEFINITIONS(${_NAME_TARGET} PRIVATE -D USE_SDL)
-        MESSAGE(STATUS "Support for SDL front end - Ready")
+        target_link_libraries(${_NAME_TARGET} PRIVATE PkgConfig::SDL PkgConfig::SDL_TTF PkgConfig::SDL_IMAGE)
 
-    ELSE()
+        target_compile_definitions(${_NAME_TARGET} PRIVATE USE_SDL)
+        message(STATUS "Support for SDL front end - Ready")
 
-        MESSAGE(FATAL_ERROR "Support for SDL front end - Failed")
+    else()
 
-    ENDIF()
+        message(FATAL_ERROR "Support for SDL front end - Failed")
 
-ENDMACRO()
+    endif()
+
+endmacro()

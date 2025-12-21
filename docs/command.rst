@@ -1,3 +1,5 @@
+.. _command-descriptions:
+
 ====================
 Command Descriptions
 ====================
@@ -52,16 +54,22 @@ Equipment list (``e``)
   objects to take advantage of their special powers.
 
 Quiver list (``|``)
-  Missiles that you carry will automatically be put in your quiver.  The
-  quiver has 10 slots; it also takes up inventory space, so every 40 
-  missiles will reduce your number of inventory slots by 1.
+  Displays the contents of your quiver.  Missiles that you carry will
+  automatically be put in your quiver if there is space.  The quiver has
+  10 slots; it also takes up inventory space:  every 40 missiles will
+  reduce your number of inventory slots by 1.  Items that are good for
+  throwing and have been :ref:`inscribed for throwing <inscribing>` (for
+  instance, the inscription includes ``@v0``) will also be placed in the
+  quiver if there is space.  Each stack of such items takes a quiver slot
+  and every 8 such items will reduce your inventory slots by 1.
 
 Drop an item (``d``)
   This drops an item from your inventory or equipment onto the dungeon
-  floor. If the floor spot you are standing on already has an object in it,
-  Angband will attempt to drop the item onto an adjacent space.  Doors and
-  traps are considered objects for the purpose of determining if the space 
-  is occupied. This command may take a quantity, and takes some energy.
+  floor.  The item will remain at your feet if possible.  Some terrain,
+  like doors and staircases, and any square with a trap can not hold
+  items, and, in that case, the game will attempt to place the item in
+  a nearby square that can hold items.  This command may take a quantity,
+  and takes some energy.
 
 Ignore an item (``k``) or Ignore an item ('^d')
   This ignores an item in your inventory or on the dungeon floor. If the
@@ -69,8 +77,8 @@ Ignore an item (``k``) or Ignore an item ('^d')
   ignored, the game will sometimes prompt you whether to ignore only this
   item or all others like it.  If the second option is chosen, all similar
   items on the floor and in your inventory will be ignored.  To view all
-  items regardless of whether they are ignored, you can use ``K`` to
-  toggle the ignore setting on and off.
+  items regardless of whether they are ignored, you can use ``K`` (``O``
+  in the roguelike keyset) to toggle the ignore setting on and off.
 
 Wear/Wield equipment (``w``)
   To wear or wield an object in your inventory, use this command. Since
@@ -94,21 +102,24 @@ Movement Commands
 Moving (arrow keys, number keys) or (arrow keys, number keys, 'yuhjklbn')
   This causes you to move one step in a given direction. If the square you
   wish to move into is occupied by a monster, you will attack it. If the
-  square is occupied by a door or a trap you may attempt to open or disarm
-  it if the appropriate option is set. Preceding this command with CTRL
-  will cause you to attack in the appropriate direction, but will not move
-  your character if no monster is there. These commands take some energy.
+  square is occupied by a door, you will attempt to open it. If the square
+  is occupied by a trap, you will attempt to disarm it unless you are
+  immune to traps:  in that case, you simply move there without harm. Preceding
+  this command with CTRL will cause you to alter (attack, tunnel, open,
+  disarm or close) in the appropriate direction, but will not move your
+  character if there is nothing there to alter. These commands take some
+  energy.
 
-Walk (``W``)
-  The walk command lets you willingly walk into a trap or a closed door,
-  without trying to open or disarm it. This command may take a count,
-  requires a direction, and takes some energy.
+Walk (``W``) or Walk (``-``)
+  The walk command lets you willingly walk into a trap without trying to
+  disarm it. This command may take a count, requires a direction, and takes
+  some energy.
 
 Run (``.``) or Run (``,``)
   This command will move in the given direction, following any bends in the
   corridor, until you either have to make a "choice" between two directions
-  or you are disturbed. You can configure what will disturb you by setting
-  the disturbance options. You may also use shift plus the "roguelike"
+  or you are disturbed. For more information about what can disturb you, see
+  :ref:`Disturb <disturb-player>`. You may also use shift plus the "roguelike"
   direction keys (roguelike keyset), or shift plus the "original" direction
   keys on the keypad (both keysets, some machines) to run in a direction.
   This command may take an argument, requires a direction, and takes some
@@ -125,14 +136,37 @@ Go up staircase (``<``)
   includes artifacts unless the "Lose artifacts when leaving level" option
   was turned off when your character was created, in which case the artifacts
   may show up again later. The option to lose artifacts is off in the default
-  configuration. This command takes some energy.
+  configuration. This command takes some energy. If the
+  :ref:`Autoexplore Commands Option <autoexplore-commands-option>` is on,
+  you are not on an up staircase, you are not confused, and no monsters are
+  in view, ``<`` will determine a path to the nearest (by number of turns)
+  known up staircase, and, if it finds a path, start you along it.
+  :ref:`Pathfinding <pathfinding-player>` has more information about how the
+  path is calculated and what happens when following the path.
 
 Go down staircase (``>``)
   Descends a down staircase you are standing on. There are always at least
   one staircase going down on each level, except for the town which has
   only one, and "quest" levels, which have none until the quest monster is
   killed. Going down a staircase will take you to a new dungeon level. See
-  "Go Up Staircase" for more info. This command takes some energy.
+  "Go Up Staircase" for more info. This command takes some energy. If the
+  :ref:`Autoexplore Commands Option <autoexplore-commands-option>` is on,
+  you are not on an down staircase, you are not confused, and no monsters are
+  in view, ``>`` will determine a path to the nearest (by number of turns)
+  known down staircase, and, if it finds a path, start you along it.
+  :ref:`Pathfinding <pathfinding-player>` has more information about how the
+  path is calculated and what happens when following the path.
+
+Path to nearest unknown grid (``p``)
+  Unless the :ref:`Autoexplore Commands Option <autoexplore-commands-option>`
+  is on, this command does nothing.  When that option is on, you are not
+  confused, and no monsters are in view, ``p`` will determine a path to
+  the nearest (by turns) known passable grid that has an unknown neighbor
+  and start you along that path.  If there is no such path, it will try
+  to find a path to the nearest known passable grid that is next to a closed
+  door or impassable rubble and that door or rubble has an unknown neighbor.
+  :ref:`Pathfinding <pathfinding-player>` has more information about how the
+  path is calculated and what happens when following the path.
 
 Resting Commands
 ================
@@ -153,11 +187,11 @@ Rest (``R``)
   Resting is better for you than repeatedly staying still, and can be told
   to automatically stop after a certain amount of time, or when various
   conditions are met. In any case, you always wake up when anything
-  disturbing happens, or when you press any key. To rest, enter the Rest
-  command, followed by the number of turns you want to rest, or ``*`` to
-  rest until your hitpoints and mana are restored, or ``&`` to rest until
-  you are fully "healed". This command may take an argument (used for the
-  number of turns to rest), and takes some energy.
+  :ref:`disturbing happens <disturb-player>`, or when you press any key.
+  To rest, enter the Rest command, followed by the number of turns you want
+  to rest, or ``*`` to rest until your hitpoints and mana are restored, or
+  ``&`` to rest until you are fully "healed". This command may take an
+  argument (used for the number of turns to rest), and takes some energy.
 
 Alter Commands
 ==============
@@ -166,7 +200,7 @@ Tunnel (``T``) or Tunnel ('^t')
   Tunnelling or mining is a very useful art. There are many kinds of rock,
   with varying hardness, including permanent rock (permanent), granite
   (very hard), quartz veins (hard), magma veins (soft), and rubble (very
-  soft). Quartz and Magma veins may be displayed in a special way, and may
+  soft). Quartz and magma veins may be displayed in a special way, and may
   sometimes contain treasure, in which case they will be displayed in a
   different way. Rubble sometimes covers an object but is easy to tunnel
   through, even with your bare hands.  Tunnelling ability increases with 
@@ -243,12 +277,11 @@ Cast a spell (``m`` in both keysets)
   a chance of failure which starts out fairly large but decreases as you
   gain levels. If you don't have enough mana to cast a spell, you will be
   prompted for confirmation. If you decide to go ahead, the chance of
-  failure is greatly increased, and you may wind up paralyzed for several
-  turns. Since you must read the spell from a book, you cannot be blind or
-  confused while casting, and there must be some light present. This
-  command takes some energy: the higher your level, the less it takes, but
-  the higher the spell level, the more it takes.
-
+  failure is greatly increased, and whether or not the spell is successfully
+  cast, you may wind up paralyzed for several turns or draining your
+  constitution. Since you must read the spell from a book, you cannot be blind
+  or confused while casting, and, unless you are a necromancer, there must be
+  some light present. This command takes some energy.
 
 Object Manipulation Commands
 ============================
@@ -286,7 +319,7 @@ Read a scroll (``r``)
 Inscribe an object (``{``) 
   This command inscribes a string on an object. The inscription is
   displayed inside curly braces after the object description. The
-  inscription is limited to the particular object (or pile) and is not
+  inscription is limited to the particular object (or stack) and is not
   automatically transferred to all similar objects. Under certain
   circumstances, Angband will display "fake" inscriptions on certain
   objects ('tried', 'empty') when appropriate. These "fake" inscriptions
@@ -300,8 +333,8 @@ Inscribe an object (``{``)
   An item labeled as '{empty}' was found to be out of charges, and an
   item labeled as '{tried}' is a "flavored" item which the character has
   used, but whose effects are unknown. Certain inscriptions have a meaning
-  to the game, see '@#', '@x#', '!*', and '!x', in the section on
-  inventory object selection.
+  to the game, see '@#', '@x#', '!!', '=g`, '!*', '!x', '^*', and '^x' in the
+  :ref:`section on inscriptions <inscribing>`.
 
 Uninscribe an object (``}``)
   This command removes the inscription on an object. This command will have
@@ -310,7 +343,8 @@ Uninscribe an object (``}``)
 Toggle ignore (``K``) or Toggle ignore (``O``)
   This command will toggle ignore settings.  If on, all ignored items 
   will be hidden from view.  If off, all items will be shown regardless
-  of their ignore setting.  See the customize section for more info.
+  of their ignore setting.  See the :ref:`section on ignoring items <ignoring>`
+  for more information.
 
 Magical Object Commands
 =======================
@@ -377,44 +411,16 @@ Throw an item (``v``)
   weapons are especially designed for throwing.  Once the
   creature is hit, the object may or may not do any damage to it. 
   Note that flasks of oil will do some fire damage to a monster on impact. 
-  If you are wielding a missile launcher compatible with the object you are
-  throwing, then you automatically use the launcher to fire the missile
-  with much higher range, accuracy, and damage, than you would get by just
-  throwing the missile. Throw, like fire, requires a direction. Targeting
-  mode (see the next command) can be invoked with ``*`` at the 
-  'Direction?' prompt. This command takes some energy.
+  Throw, like fire, requires a direction. Targeting mode (see the next
+  command) can be invoked with ``*`` at the 'Direction?' prompt. This command
+  takes some energy.
 
 Targeting Mode (``*``)
-  This will allow you to aim your ranged attacks at a specific monster or
-  grid, so that you can point directly towards that monster or grid (even
-  if this is not a "compass" direction) when you are asked for a direction.
-  You can set a target using this command, or you can set a new target at
-  the "Direction?" prompt when appropriate. At the targeting prompt, you
-  have many options. First of all, targeting mode starts targeting nearby
-  monsters which can be reached by "projectable" spells and thrown objects.
-  In this mode, you can press ``t`` (or ``5`` or ``.``) to select the
-  current monster, space to advance to the next monster, ``-`` to back up to
-  the previous monster, direction keys to advance to a monster more or less
-  in that direction, ``r`` to "recall" the current monster, ``q`` to exit
-  targeting mode, and ``p`` (or ``o``) to stop targeting monsters and
-  enter the mode for targeting a location on the floor or in a wall. Note
-  that if there are no nearby monsters, you will automatically enter this
-  mode. Note that hitting ``o`` is just like ``p``, except that the
-  location cursor starts on the last examined monster instead of on the
-  player. In this mode, you use the "direction" keys to move around, and
-  the ``q`` key to quit, and the ``t`` (or ``5`` or ``.``) key to target
-  the cursor location. Note that targeting a location is slightly
-  "dangerous", as the target is maintained even if you are far away. To
-  cancel an old target, simply hit ``*`` and then 'ESCAPE' (or ``q``).
-  Note that when you cast a spell or throw an object at the target
-  location, the path chosen is the "optimal" path towards that location,
-  which may or may not be the path you want. Sometimes, by clever choice of
-  a location on the floor for your target, you may be able to convince a
-  thrown object or cast spell to squeeze through a hole or corridor that is
-  blocking direct access to a different grid. Launching a ball spell or
-  breath weapon at a location in the middle of a group of monsters can
-  often improve the effects of that attack, since ball attacks are not
-  stopped by interposed monsters if the ball is launched at a target.
+  This will allow you to change or clear the current target.  That target
+  can be recalled when other commands ask for a target.  When the
+  current target is a monster, the status of that monster is tracked in the
+  sidebar.  For more details about the targeting interface that this
+  command uses, see :ref:`Targeting <targeting>`.
 
 Looking Commands
 ================
@@ -438,13 +444,10 @@ Look around (``l``) or Examine things (``x``)
   This command is used to look around at nearby monsters (to determine 
   their type and health) and objects (to determine their type). It is also 
   used to find out if a monster is currently inside a wall, and what is 
-  under the player. When you are looking at something, you may hit space 
-  for more details, or to advance to the next interesting monster or 
-  object, or minus (``-``) to go back to the previous monster or object, 
-  or a direction key to advance to the nearest interesting monster or 
-  object (if any) in that general direction, or ``r`` to recall 
-  information about the current monster race, or ``q`` or escape to stop 
-  looking around. You always start out looking at "yourself". 
+  under the player. You could also use it to set the current target, but,
+  when you want to target a monster, the targeting command, ``*``, will be
+  more useful.  For more information about the targeting interface that
+  this command uses, see :ref:`Targeting <targeting>`.
 
 Inspect an item (``I``)
   This command lets you inspect an item. This will tell you things about
@@ -622,10 +625,12 @@ Save ('Ctrl-s')
   if you are paranoid about having your computer crash (or your power go
   out) while you are playing.
 
-Quit (``Q``)
-  Kills your character and exits Angband. You will be prompted to make sure
-  you really want to do this, and then asked to verify that choice. Note
-  that dead characters are dead forever.
+Retire (``Q``)
+  Retires your character and exits Angband. You will be prompted to make sure
+  you really want to do this, and then asked to verify that choice. The
+  only thing that can be done with a retired character's save file is to
+  start the game from the beginning.  You will have the option to reuse
+  the same options and birth choices as the retired character when you do so.
 
 User Pref File Commands
 =======================
@@ -635,14 +640,12 @@ Interact with options (``=``)
   may mark your savefile as unsuitable for the high score list. The
   "window" options allow you to specify what should be drawn in any of the
   special sub-windows (not available on all platforms). See the help files
-  'customize.txt' and 'options.txt' for more info. You can also interact
-  with keymaps under this menu.
+  for :doc:`customization <customize>` and :doc:`options <option>` for more
+  information. You can also interact with keymaps under this menu.
 
 Interact with keymaps - option submenu
   Allow you to interact with keymaps. You may load or save keymaps from
-  user pref files, or define keymaps. You must define a "current action",
-  shown at the bottom of the screen, before you attempt to use any of the
-  "create macro" commands, which use that "current action" as their action.
+  user pref files, or define keymaps.
  
 Interact with visuals - option submenu
   Allow you to interact with visuals. You may load or save visuals from
@@ -669,7 +672,7 @@ Help (``?``)
 Identify Symbol (``/``)
   Use this command to find out what a character stands for. For instance,
   by pressing '/.', you can find out that the ``.`` symbol stands for a
-  floor spot. When used with a symbol that represents creatures, the this
+  floor spot. When used with a symbol that represents creatures, this
   command will tell you only what class of creature the symbol stands for,
   not give you specific information about a creature you can see. To get
   that, use the Look command.
@@ -762,10 +765,11 @@ Command Counts
 
 Some commands can be executed a fixed number of times by preceding them
 with a count. Counted commands will execute until the count expires, until
-you type any character, or until something significant happens, such as
-being attacked. Thus, a counted command doesn't work to attack another
-creature. While the command is being repeated, the number of times left to
-be repeated will flash by on the line at the bottom of the screen.
+you type any character, or until
+:ref:`something significant happens <disturb-player>`, such as being attacked.
+Thus, a counted command doesn't work to attack another creature. While the
+command is being repeated, the number of times left to be repeated will flash
+by on the line at the bottom of the screen.
 
 To give a count to a command, type ``0``, the repeat count, and then the
 command. If you want to give a movement command and you are using the

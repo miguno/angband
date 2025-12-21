@@ -1,24 +1,31 @@
-MACRO(CONFIGURE_SDL2_FRONTEND _NAME_TARGET)
+macro(configure_sdl2_frontend _NAME_TARGET)
 
-    INCLUDE(FindPkgConfig)
+    find_package(PkgConfig REQUIRED)
 
-    PKG_SEARCH_MODULE(SDL2 sdl2)
-    PKG_SEARCH_MODULE(SDL2_TTF SDL2_ttf>=2.0.0)
-    PKG_SEARCH_MODULE(SDL2_IMAGE SDL2_image>=2.0.0)
+    pkg_check_modules(SDL2 QUIET IMPORTED_TARGET sdl2)
+    pkg_check_modules(SDL2_TTF QUIET IMPORTED_TARGET SDL2_ttf>=2.0.0)
+    pkg_check_modules(SDL2_IMAGE QUIET IMPORTED_TARGET SDL2_image>=2.0.0)
 
-    IF(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_TTF_FOUND)
+    if(SDL2_FOUND AND SDL2_IMAGE_FOUND AND SDL2_TTF_FOUND)
 
-        TARGET_LINK_LIBRARIES(${_NAME_TARGET} PRIVATE ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
-        TARGET_INCLUDE_DIRECTORIES(${_NAME_TARGET} PRIVATE ${SDL2_INCLUDE_DIRS} ${SDL2_TTF_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS})
-        TARGET_COMPILE_DEFINITIONS(${_NAME_TARGET} PRIVATE -D USE_SDL2)
-        TARGET_COMPILE_OPTIONS(${_NAME_TARGET} PRIVATE ${SDL2_CFLAGS} ${SDL2_TTF_CFLAGS} ${SDL2_IMAGE_CFLAGS})
-        TARGET_LINK_OPTIONS(${_NAME_TARGET} PRIVATE ${SDL2_LDFLAGS} ${SDL2_TTF_LDFLAGS} ${SDL2_IMAGE_LDFLAGS})
-        MESSAGE(STATUS "Support for SDL2 front end - Ready")
+        include(PkgConfigHelpers)
+        angband_pkgconfig_select_target(SDL2       SDL2_SELECTED)
+        angband_pkgconfig_select_target(SDL2_TTF   SDL2_TTF_SELECTED)
+        angband_pkgconfig_select_target(SDL2_IMAGE SDL2_IMAGE_SELECTED)
 
-    ELSE()
+        target_link_libraries(${_NAME_TARGET} PRIVATE
+            ${SDL2_SELECTED}
+            ${SDL2_TTF_SELECTED}
+            ${SDL2_IMAGE_SELECTED}
+        )
+        target_compile_definitions(${_NAME_TARGET} PRIVATE USE_SDL2)
 
-        MESSAGE(FATAL_ERROR "Support for SDL2 front end - Failed")
+        message(STATUS "Support for SDL2 front end - Ready")
 
-    ENDIF()
+    else()
 
-ENDMACRO()
+        message(FATAL_ERROR "Support for SDL2 front end - Failed")
+
+    endif()
+
+endmacro()

@@ -1,31 +1,34 @@
-MACRO(CONFIGURE_GCU_FRONTEND _NAME_TARGET)
+macro(configure_gcu_frontend _NAME_TARGET)
+    find_package(PkgConfig REQUIRED)
 
-    # 3.10 required for CURSES_NEED_WIDE
-    CMAKE_MINIMUM_REQUIRED(VERSION 3.10...3.26 FATAL_ERROR)
-    SET(CURSES_NEED_WIDE TRUE)
-    # Only ncurses provides wide character support so require that as well.
-    SET(CURSES_NEED_NCURSES TRUE)
-    FIND_PACKAGE(Curses)
+    if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+        # OpenBSD ships ncursesw by default; only 'ncurses.pc' exists
+        pkg_check_modules(CURSES REQUIRED IMPORTED_TARGET ncurses)
+    else()
+        pkg_check_modules(CURSES REQUIRED IMPORTED_TARGET ncursesw)
+    endif()
 
-    IF (CURSES_FOUND)
+    include(PkgConfigHelpers)
+    angband_pkgconfig_select_target(CURSES CURSES_SELECTED)
+    target_link_libraries(${_NAME_TARGET} PRIVATE ${CURSES_SELECTED})
 
-        TARGET_LINK_LIBRARIES(${_NAME_TARGET} PRIVATE ${CURSES_LIBRARIES})
-        TARGET_INCLUDE_DIRECTORIES(${_NAME_TARGET} PRIVATE ${CURSES_INCLUDE_DIRS})
-        TARGET_COMPILE_DEFINITIONS(${_NAME_TARGET} PRIVATE -D USE_GCU)
-        TARGET_COMPILE_DEFINITIONS(${_NAME_TARGET} PRIVATE -D USE_NCURSES)
+    target_compile_definitions(${_NAME_TARGET} PRIVATE
+        USE_GCU
+        USE_NCURSES
+        $<$<BOOL:${WIN32}>:WIN32_CONSOLE_MODE>
+        $<$<BOOL:${MINGW}>:MSYS2_ENCODING_WORKAROUND>
+    )
 
-        CHECK_LIBRARY_EXISTS(${CURSES_LIBRARY} use_default_colors "" ANGBAND_CURSES_NCURSES_HAS_USE_DEFAULT_COLORS)
-        IF (ANGBAND_CURSES_NCURSES_HAS_USE_DEFAULT_COLORS)
-            TARGET_COMPILE_DEFINITIONS(${_NAME_TARGET} PRIVATE -D HAVE_USE_DEFAULT_COLORS)
-            MESSAGE(STATUS "Using use_default_colors() with GCU front end")
-        ENDIF()
+    # Check if use_default_colors() exists
+    include(CheckSymbolExists)
+    set(CMAKE_REQUIRED_LIBRARIES ${CURSES_SELECTED})
+    set(CMAKE_REQUIRED_INCLUDES ${CURSES_INCLUDE_DIRS})
+    check_symbol_exists(use_default_colors "curses.h" ANGBAND_NCURSESW_HAS_USE_DEFAULT_COLORS)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    if(ANGBAND_NCURSESW_HAS_USE_DEFAULT_COLORS)
+        target_compile_definitions(${_NAME_TARGET} PRIVATE HAVE_USE_DEFAULT_COLORS)
+    endif()
 
-        MESSAGE(STATUS "Support for GCU front end - Ready")
-
-    ELSE()
-
-        MESSAGE(FATAL_ERROR "Support for GCU front end - Failed")
-
-    ENDIF()
-
-ENDMACRO()
+    message(STATUS "Support for GCU front end - Ready")
+endmacro()

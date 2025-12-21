@@ -10,10 +10,10 @@ which is shown on the "options" screen, plus the internal name of the
 option in brackets, followed by a textual description of the option.
 
 Various concepts are mentioned in the descriptions below, including
-"disturb", (cancel any running, resting, or repeated commands, which are in
-progress), "flush" (forget any keypresses waiting in the keypress queue),
-"fresh" (dump any pending output to the screen), and "sub-windows" (see
-below).
+:ref:`"disturb" <disturb-player>` (cancel any running, resting, or repeated
+commands, which are in progress), "flush" (forget any keypresses waiting in
+the keypress queue), "fresh" (dump any pending output to the screen), and
+"sub-windows" (see below).
 
 .. contents:: Option pages
    :local:
@@ -54,6 +54,10 @@ Show damage player deals to monsters ``show_damage``
   Shows the damage that the player deals to monsters for melee and ranged 
   combat in the messages.
 
+.. _old-target-option:
+.. index::
+   single: targeting; old target option
+
 Use old target by default ``use_old_target``
   Forces all commands which normally ask for a "direction" to use the
   current "target" if there is one. Use of this option can be dangerous if
@@ -78,6 +82,10 @@ Highlight target with cursor ``show_target``
 Highlight player with cursor between turns ``highlight_player``
   Highlights the player with a cursor.  Useful if you have trouble finding
   the player.
+
+.. _disturb-near-option:
+.. index::
+   single: disturb; option
 
 Disturb whenever viewable monster moves ``disturb_near``
   Disturb the player when any viewable monster moves, whenever any monster
@@ -125,6 +133,8 @@ Color: Player color indicates low hit points ``hp_changes_color``
 Allow mouse clicks to move the player  ``mouse_movement``
   Clicking on the main window will be interpreted as a move command to that
   spot.
+
+.. _notify-recharge-option:
 
 Notify on object recharge ``notify_recharge``
   This causes the game to print a message when any rechargeable object
@@ -233,6 +243,8 @@ Persistent levels (experimental) ``birth_levels_persist``
   Each level is generated for the first time when the player enters it, and 
   from then on when the player returns the level is as they last saw it, 
   including monsters, items and traps.
+
+.. _damage-percent-of-dice-option:
 
 To-damage is a percentage of dice (experimental) ``birth_percent_damage``
   Instead of bonuses to damage being just added on to damage dealt, each +1

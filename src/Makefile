@@ -45,6 +45,16 @@ $(PROGNAME).a: $(OBJECTS)
 		$(LINK_FAILED); \
 	fi
 
+# Allow for some introspection:  have rules to print out names that something
+# downstream could use.  Have the output start with "our-<something>=" so it
+# can very likely be separated from whatever other junk the build system prints
+# out.
+print-project-name:
+	@echo our-project-name=${NAME}
+
+print-executable-name:
+	@echo our-executable-name=${PROG}
+
 check: tests
 tests: $(PROGNAME).a
 	env CC="$(CC)" CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" \
@@ -125,7 +135,7 @@ install-extra:
 		done ; \
 		for i in zlib1.dll libpng12.dll ; do \
 			${INSTALL_STATUS}; \
-			if ${INSTALL} -m 644 win/dll/$$i ../$$i ; then \
+			if ${INSTALL} -m 755 win/dll/$$i ../$$i ; then \
 				${INSTALL_OK}; \
 			else \
 				${INSTALL_FAILED}; \
@@ -146,4 +156,4 @@ post-install:
 	fi
 
 FORCE :
-.PHONY : check tests coverage clean-coverage tests/ran-already
+.PHONY : print-project-name print-executable-name check tests coverage clean-coverage tests/ran-already
