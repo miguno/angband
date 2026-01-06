@@ -31,23 +31,23 @@
 #include "SDL_revision.h"
 
 #include "main.h"
-#include "init.h"
-#include "ui-term.h"
 #include "buildid.h"
-#include "ui-display.h"
-#include "ui-command.h"
-#include "player-calcs.h"
-#include "ui-output.h"
 #include "game-world.h"
-#include "ui-input.h"
-#include "ui-prefs.h"
 #include "grafmode.h"
-#include "ui-game.h"
-#include "ui-map.h"
+#include "init.h"
 #include "parser.h"
+#include "player-calcs.h"
 #ifdef SOUND_SDL2
 #include "sound.h"
 #endif
+#include "ui-command.h"
+#include "ui-display.h"
+#include "ui-game.h"
+#include "ui-input.h"
+#include "ui-map.h"
+#include "ui-output.h"
+#include "ui-prefs.h"
+#include "ui-term.h"
 
 #define MAX_SUBWINDOWS \
 	ANGBAND_TERM_MAX
@@ -208,7 +208,7 @@ struct font {
 	char *path;
 	int size;
 	/* index of font in the application's fonts array */
-	size_t index;
+	int index;
 
 	struct font_cache cache;
 };
@@ -420,7 +420,7 @@ struct font_info {
 	char *name;
 	char *path;
 	int size;
-	size_t index;
+	int index;
 	enum font_type type;
 };
 
@@ -463,6 +463,13 @@ struct my_app {
 	int font_alloc;
 	/** Width and height on screen for the default font */
 	int def_font_w, def_font_h;
+	/**
+	 * one if the player requested an exit while the game was not at a
+	 * command prompt; any non-zero value other than one when ready to
+	 * save the game at exit but the game may prompt for additional input;
+	 * zero in all other cases
+	 */
+	int quit_when_ready;
 	/**
 	 * true if KC_MOD_KEYPAD will be sent for numeric keypad keys at the
 	 * expense of not handling some keyboard layouts properly
@@ -540,7 +547,7 @@ static bool is_close_to(int a, int b, unsigned range);
 static void handle_window_closed(struct my_app *a,
 		struct sdlpui_window *window);
 static void refresh_angband_terms(struct my_app *a);
-static void handle_quit(void);
+static void handle_quit(struct my_app *a, bool forced);
 static void wait_anykey(struct my_app *a);
 static void keyboard_event_to_angband_key(const SDL_KeyboardEvent *key,
 		bool kp_as_mod, keycode_t *ch, uint8_t *mods);
@@ -2122,6 +2129,7 @@ static void show_about(struct sdlpui_window *window, int x, int y)
 	if (!window->infod) {
 		char path[4096];
 		SDL_Texture *texture;
+		const char *copyright_eol;
 
 		window->infod = sdlpui_start_simple_info("Ok", NULL,
 			recreate_about_dialog_textures, 0);
@@ -2133,6 +2141,20 @@ static void show_about(struct sdlpui_window *window, int x, int y)
 			DEFAULT_XTRA_BORDER, DEFAULT_XTRA_BORDER);
 		sdlpui_simple_info_add_label(window->infod, buildid,
 			SDLPUI_HOR_CENTER);
+		copyright_eol = SDL_strstr(copyright, "\n");
+		if (copyright_eol) {
+			char *line = SDL_malloc((size_t)(copyright_eol
+				- copyright) + 1);
+
+			(void)SDL_strlcpy(line, copyright,
+				(size_t)(copyright_eol - copyright) + 1);
+			sdlpui_simple_info_add_label(window->infod, line,
+				SDLPUI_HOR_CENTER);
+			SDL_free(line);
+		} else {
+			sdlpui_simple_info_add_label(window->infod, copyright,
+				SDLPUI_HOR_CENTER);
+		}
 		sdlpui_simple_info_add_label(window->infod,
 			"See http://www.rephial.org", SDLPUI_HOR_CENTER);
 		sdlpui_simple_info_add_label(window->infod,
@@ -2611,7 +2633,7 @@ static void handle_menu_quit(struct sdlpui_control *ctrl,
 		struct sdlpui_dialog *dlg, struct sdlpui_window *window)
 {
 	sdlpui_popdown_dialog(dlg, window, true);
-	handle_quit();
+	handle_quit(window->app, false);
 }
 
 static void handle_menu_tile_set(struct sdlpui_control *ctrl,
@@ -2799,17 +2821,15 @@ static void handle_menu_pw(struct sdlpui_control *ctrl,
 static void handle_menu_font_name(struct sdlpui_control *ctrl,
 		struct sdlpui_dialog *dlg, struct sdlpui_window *window)
 {
-	int tag, index, old_index;
+	int tag = sdlpui_get_tag(ctrl), index, old_index;
 	struct subwindow *subwindow;
 	const struct font_info *font_info;
 
-	SDL_assert(ctrl->ftb->get_tag);
-	tag = (*ctrl->ftb->get_tag)(ctrl);
+	SDL_assert(tag >= 0);
 	subwindow = get_subwindow_by_index(window,
-		(unsigned int)(tag / (2 * window->app->font_count) - 1), false);
+		(unsigned int)(tag % MAX_SUBWINDOWS), false);
 	SDL_assert(subwindow);
-	index = (unsigned int)tag
-		% (unsigned int)(2 * window->app->font_count);
+	index = tag / MAX_SUBWINDOWS;
 	old_index = subwindow->font->index;
 	font_info = &window->app->fonts[index];
 
@@ -2829,9 +2849,8 @@ static void handle_menu_font_name(struct sdlpui_control *ctrl,
 
 	if (reload_font(subwindow, font_info)) {
 		/* Set the previous selected font in the menu to off. */
-		int target_tag = tag
-			- (tag % (2 * window->app->font_count))
-			+ old_index;
+		int target_tag = (int)subwindow->index + MAX_SUBWINDOWS
+			* old_index;
 		bool searching = true;
 		int minw, minh;
 
@@ -2966,33 +2985,20 @@ static struct sdlpui_dialog *handle_menu_font_names(struct sdlpui_control *ctrl,
 		struct sdlpui_dialog *dlg, struct sdlpui_window *window,
 		int ul_x_win, int ul_y_win)
 {
-	int tag;
-	SDL_Renderer *renderer;
+	int tag = sdlpui_get_tag(ctrl);
+	SDL_Renderer *renderer = sdlpui_get_renderer(window);
 	struct subwindow *subwindow;
 	struct sdlpui_dialog *result;
 	struct sdlpui_control *c;
 	bool more_nesting = false;
 	int win_w, win_h, start, count, i;
 
-	renderer = sdlpui_get_renderer(window);
 	SDL_GetRendererOutputSize(renderer, &win_w, &win_h);
-	SDL_assert(ctrl->ftb->get_tag);
-	tag = (*ctrl->ftb->get_tag)(ctrl);
-	if (tag < 2 * window->app->font_count) {
-		/* At the top level */
-		subwindow = get_subwindow_by_index(window, tag, false);
-		tag = (tag + 1) * 2 * window->app->font_count;
-		start = 0;
-	} else {
-		/* Nested */
-		subwindow = get_subwindow_by_index(window,
-			tag / (2 * window->app->font_count) - 1, false);
-		start = tag % (2 * window->app->font_count)
-			- window->app->font_count;
-		assert(start >= 0);
-		tag -= start + window->app->font_count;
-	}
+	SDL_assert(tag >= 0);
+	subwindow = get_subwindow_by_index(window,
+		(unsigned int)(tag % MAX_SUBWINDOWS), false);
 	SDL_assert(subwindow);
+	start = tag / MAX_SUBWINDOWS;
 	SDL_assert(start <= window->app->font_count);
 	/*
 	 * Figure out how many entries can fit.  Use the size of the parent
@@ -3015,7 +3021,8 @@ static struct sdlpui_dialog *handle_menu_font_names(struct sdlpui_control *ctrl,
 			SDLPUI_MFLG_NONE);
 		sdlpui_create_submenu_button(c, "More", SDLPUI_HOR_LEFT,
 			handle_menu_font_names, SDLPUI_CHILD_MENU_RIGHT,
-			tag + window->app->font_count + start + count, false);
+			(int)subwindow->index + MAX_SUBWINDOWS
+			* (start + count), false);
 	}
 	for (i = start; i < start + count; ++i) {
 		c = sdlpui_get_simple_menu_next_unused(result,
@@ -3024,8 +3031,9 @@ static struct sdlpui_dialog *handle_menu_font_names(struct sdlpui_control *ctrl,
 		 * Optimistically assume that it'll be possible to resize
 		 * the subwindow for this font.
 		 */
-		sdlpui_create_menu_toggle(c, window->app->fonts[i].name,				SDLPUI_HOR_LEFT, handle_menu_font_name, tag + i,
-			false, subwindow->font->index == (unsigned int)i);
+		sdlpui_create_menu_toggle(c, window->app->fonts[i].name,				SDLPUI_HOR_LEFT, handle_menu_font_name,
+			(int)subwindow->index + MAX_SUBWINDOWS * i,
+			false, subwindow->font->index == i);
 	}
 	sdlpui_complete_simple_menu(result, window);
 	result->rect.x = ul_x_win;
@@ -3570,7 +3578,7 @@ static void handle_window_closed(struct my_app *a, struct sdlpui_window *window)
 	assert(window != NULL);
 
 	if (window->index == MAIN_WINDOW) {
-		handle_quit();
+		handle_quit(a, false);
 	} else {
 		for (size_t i = 0; i < N_ELEMENTS(window->subwindows); i++) {
 			struct subwindow *subwindow = window->subwindows[i];
@@ -4547,7 +4555,7 @@ static void wait_anykey(struct my_app *a)
 				SDL_FlushEvent(SDL_MOUSEMOTION);
 				break;
 			case SDL_QUIT:
-				handle_quit();
+				handle_quit(a, false);
 				break;
 			case SDL_RENDER_TARGETS_RESET:
 				recreate_textures(a, false);
@@ -4562,13 +4570,59 @@ static void wait_anykey(struct my_app *a)
 	}
 }
 
-static void handle_quit(void)
+static void handle_quit(struct my_app *a, bool forced)
 {
-	/* XXX copied from main-sdl.c */
-	if (character_generated && inkey_flag) {
-		/* no idea what that does :) */
+	if (character_generated) {
+		/*
+		 * Want to be at a command prompt so the game's state is
+		 * ready to save.  If not at a command prompt and not forcing
+		 * an exit, mark as ready to quit: term_xtra_event() will use
+		 * that to either call back to here when it is safe to save or
+		 * send escapes to the game to satisfy its requests for input.
+		 */
+		if (!inkey_flag && !forced) {
+			a->quit_when_ready = 1;
+			return;
+		}
+
+		/* Drop pending messages. */
 		msg_flag = false;
-		save_game();
+		a->quit_when_ready = 2;
+		/*
+		 * If not forcing an exit, allow the player to abort the exit
+		 * if there is trouble saving the game.
+		 */
+		if (!forced && !save_game_checked()) {
+			SDL_MessageBoxButtonData buttons[2] = {
+				{
+					0, 0, "Yes"
+				},
+				{
+					SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT
+					| SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT,
+					1,
+					"No"
+				}
+			};
+			SDL_MessageBoxData dialog;
+			int button_pressed = 1;
+
+			dialog.flags = SDL_MESSAGEBOX_ERROR
+				| SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT;
+			dialog.window = a->windows[0].window;
+			dialog.title = "Confirm Quitting";
+			dialog.message = "Saving failed.  Really quit?";
+			dialog.numbuttons = 2;
+			dialog.buttons = buttons;
+			dialog.colorScheme = NULL;
+
+			(void)SDL_ShowMessageBox(&dialog, &button_pressed);
+			if (button_pressed != 0) {
+				a->quit_when_ready = 0;
+				return;
+			}
+		}
+		close_game(false);
 	}
 
 	quit(NULL);
@@ -4617,7 +4671,7 @@ static bool get_event(struct my_app *a)
 			recreate_textures(a, true);
 			return false;
 		case SDL_QUIT:
-			handle_quit();
+			handle_quit(a, false);
 			return false;
 		default:
 			return false;
@@ -4667,6 +4721,23 @@ static errr term_xtra_event(int v)
 	assert(subwindow != NULL);
 
 	redraw_all_windows(subwindow->app, true);
+
+	if (subwindow->app->quit_when_ready) {
+		if (inkey_flag && subwindow->app->quit_when_ready == 1) {
+			/*
+			 * The game is at a command prompt and has a
+			 * consistent state so it is safe to save and exit.
+			 */
+			handle_quit(subwindow->app, false);
+		} else {
+			/*
+			 * Send an escape to satisfy whatever the game is
+			 * asking for.
+			 */
+			Term_keypress(ESCAPE, 0);
+		}
+		return 0;
+	}
 
 	if (v) {
 		while (true) {
@@ -6850,8 +6921,6 @@ static void free_subwindow_config(struct subwindow_config *config)
 
 static void free_subwindow(struct subwindow *subwindow)
 {
-	assert(subwindow->loaded);
-
 	free_font(subwindow->font);
 	subwindow->font = NULL;
 	if (subwindow->texture != NULL) {
@@ -7072,6 +7141,7 @@ static void quit_hook(const char *s)
 	}
 
 	free_globals(&g_app);
+	close_graphics_modes();
 	quit_systems();
 }
 
@@ -7253,6 +7323,7 @@ static void init_globals(struct my_app *a)
 
 	a->w_mouse = NULL;
 	a->w_key = NULL;
+	a->quit_when_ready = 0;
 	a->kp_as_mod = true;
 	a->controller = NULL;
 	num_joysticks = SDL_NumJoysticks();
