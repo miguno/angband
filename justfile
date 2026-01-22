@@ -27,7 +27,7 @@ build-linux-console:
 # build console macOS binary with ncurses support
 [group('development')]
 build-macos-console:
-    (cd src && make -f Makefile.osx-ncurses clean install) || exit 1
+    (cd src && make -f Makefile.std SYS_gcu="-DUSE_GCU -DUSE_NCURSES -lncurses" clean install) || exit 1
     @echo
     @echo "Run the 'angband' binary in the top-level project folder."
 
