@@ -22,6 +22,7 @@
 #include "pui-misc.h"
 
 
+static const char *get_image_type_name(const struct sdlpui_control *c);
 static void render_image(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, SDL_Renderer *r);
 static void resize_image(struct sdlpui_control *c, struct sdlpui_dialog *d,
@@ -31,6 +32,8 @@ static void query_image_natural_size(struct sdlpui_control *c,
 		int *width, int *height);
 static void cleanup_image(struct sdlpui_control *c);
 
+static const char *get_label_type_name(const struct sdlpui_control *c);
+static const char *get_label_caption(const struct sdlpui_control *c);
 static void change_label_caption(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const char *new_caption);
@@ -43,6 +46,8 @@ static void query_label_natural_size(struct sdlpui_control *c,
 		int *width, int *height);
 static void cleanup_label(struct sdlpui_control *c);
 
+static const char *get_pb_type_name(const struct sdlpui_control *c);
+static const char *get_pb_caption(const struct sdlpui_control *c);
 static void change_pb_caption(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const char *new_caption);
@@ -65,25 +70,29 @@ static void arm_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, enum sdlpui_action_hint hint);
 static void disarm_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, enum sdlpui_action_hint hint);
-static int get_pb_interactable_component(struct sdlpui_control *c, bool first);
+static int get_pb_interactable_component(struct sdlpui_control *c,
+		SDL_bool first);
 static void resize_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, int width, int height);
 static void query_pb_natural_size(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		int *width, int *height);
-static bool is_pb_disabled(const struct sdlpui_control *c);
-static bool set_pb_disabled(struct sdlpui_control *c, struct sdlpui_dialog *d,
-		struct sdlpui_window *w, bool disabled);
+static SDL_bool is_pb_disabled(const struct sdlpui_control *c);
+static SDL_bool set_pb_disabled(struct sdlpui_control *c,
+		struct sdlpui_dialog *d, struct sdlpui_window *w,
+		SDL_bool disabled);
 static int get_pb_tag(const struct sdlpui_control *c);
 static int set_pb_tag(struct sdlpui_control *c, int new_tag);
 static void cleanup_pb(struct sdlpui_control *c);
 
-static bool handle_mb_mousemove(struct sdlpui_control *c,
+static SDL_bool handle_mb_mousemove(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_MouseMotionEvent *e);
-static bool handle_mb_mousewheel(struct sdlpui_control *c,
+static SDL_bool handle_mb_mousewheel(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_MouseWheelEvent *e);
+static const char *get_mb_type_name(const struct sdlpui_control *c);
+static const char *get_mb_caption(const struct sdlpui_control *c);
 static void change_mb_caption(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const char *new_caption);
@@ -109,8 +118,9 @@ static void arm_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, enum sdlpui_action_hint hint);
 static void disarm_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, enum sdlpui_action_hint hint);
-static int get_mb_interactable_component(struct sdlpui_control *c, bool first);
-static bool step_within_mb(struct sdlpui_control *c, bool forward);
+static int get_mb_interactable_component(struct sdlpui_control *c,
+		SDL_bool first);
+static SDL_bool step_within_mb(struct sdlpui_control *c, SDL_bool forward);
 static int get_mb_interactable_component_at(struct sdlpui_control *c, Sint32 x,
 		Sint32 y);
 static void resize_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
@@ -118,9 +128,10 @@ static void resize_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 static void query_mb_natural_size(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		int *width, int *height);
-static bool is_mb_disabled(const struct sdlpui_control *c);
-static bool set_mb_disabled(struct sdlpui_control *c, struct sdlpui_dialog *d,
-		struct sdlpui_window *w, bool disabled);
+static SDL_bool is_mb_disabled(const struct sdlpui_control *c);
+static SDL_bool set_mb_disabled(struct sdlpui_control *c,
+		struct sdlpui_dialog *d, struct sdlpui_window *w,
+		SDL_bool disabled);
 static int get_mb_tag(const struct sdlpui_control *c);
 static int set_mb_tag(struct sdlpui_control *c, int new_tag);
 static void cleanup_mb(struct sdlpui_control *c);
@@ -137,6 +148,8 @@ static const struct sdlpui_control_funcs image_funcs = {
 	NULL,
 	NULL,
 	NULL,
+	NULL,
+	get_image_type_name,
 	NULL,
 	NULL,
 	render_image,
@@ -168,6 +181,8 @@ static const struct sdlpui_control_funcs label_funcs = {
 	NULL,
 	NULL,
 	NULL,
+	get_label_type_name,
+	get_label_caption,
 	change_label_caption,
 	render_label,
 	NULL,
@@ -198,6 +213,8 @@ const struct sdlpui_control_funcs push_button_funcs = {
 	sdlpui_control_handle_mouseclick,
 	sdlpui_control_handle_mousemove,
 	NULL,
+	get_pb_type_name,
+	get_pb_caption,
 	change_pb_caption,
 	render_pb,
 	respond_default_pb,
@@ -228,6 +245,8 @@ static const struct sdlpui_control_funcs menu_button_funcs = {
 	sdlpui_control_handle_mouseclick,
 	handle_mb_mousemove,
 	handle_mb_mousewheel,
+	get_mb_type_name,
+	get_mb_caption,
 	change_mb_caption,
 	render_mb,
 	respond_default_mb,
@@ -251,6 +270,12 @@ static const struct sdlpui_control_funcs menu_button_funcs = {
 };
 
 
+static const char *get_image_type_name(const struct sdlpui_control *c)
+{
+	return "image";
+}
+
+
 static void render_image(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		struct sdlpui_window *w, SDL_Renderer *r)
 {
@@ -258,8 +283,8 @@ static void render_image(struct sdlpui_control *c, struct sdlpui_dialog *d,
 
 	SDL_assert(c->type_code == SDLPUI_CTRL_IMAGE && c->priv);
 	ip = c->priv;
-	SDLPUI_RENDER_TRACER("image", c, "(none)", c->rect, ip->image_rect,
-		d->texture);
+	SDLPUI_RENDER_TRACER((*c->ftb->get_type_name)(c), c, "(none)",
+		c->rect, ip->image_rect, d->texture);
 
 	if (ip->image_rect.w > 0 && ip->image_rect.h > 0) {
 		SDL_Rect dst_r = ip->image_rect;
@@ -394,6 +419,22 @@ static void cleanup_image(struct sdlpui_control *c)
 }
 
 
+static const char *get_label_type_name(const struct sdlpui_control *c)
+{
+	return "label";
+}
+
+
+static const char *get_label_caption(const struct sdlpui_control *c)
+{
+	struct sdlpui_label *lp;
+
+	SDL_assert(c->type_code == SDLPUI_CTRL_LABEL && c->priv);
+	lp = c->priv;
+	return lp->caption;
+}
+
+
 static void change_label_caption(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const char *new_caption)
@@ -405,7 +446,7 @@ static void change_label_caption(struct sdlpui_control *c,
 	SDL_free(lp->caption);
 	lp->caption = SDL_strdup(new_caption);
 	resize_label(c, d, w, c->rect.w, c->rect.h);
-	d->dirty = true;
+	d->dirty = SDL_TRUE;
 	sdlpui_signal_redraw(w);
 }
 
@@ -419,8 +460,9 @@ static void render_label(struct sdlpui_control *c, struct sdlpui_dialog *d,
 
 	SDL_assert(c->type_code == SDLPUI_CTRL_LABEL && c->priv);
 	lp = c->priv;
-	SDLPUI_RENDER_TRACER("label", c, lp->caption, c->rect,
-		lp->caption_rect, d->texture);
+	SDLPUI_RENDER_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), c->rect, lp->caption_rect,
+		d->texture);
 
 	if (lp->caption_rect.w > 0 && lp->caption_rect.h > 0) {
 		SDL_Rect dst_r = lp->caption_rect;
@@ -435,7 +477,8 @@ static void render_label(struct sdlpui_control *c, struct sdlpui_dialog *d,
 			dst_r.x += d->rect.x;
 			dst_r.y += d->rect.y;
 		}
-		sdlpui_render_utf8_line(r, font, fg, &dst_r, lp->caption);
+		sdlpui_render_utf8_line(r, font, fg, &dst_r,
+			(*c->ftb->get_caption)(c));
 	}
 }
 
@@ -450,7 +493,7 @@ static void resize_label(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_LABEL && c->priv);
 	lp = c->priv;
 
-	sdlpui_get_utf8_metrics(font, lp->caption, &sw, &sh);
+	sdlpui_get_utf8_metrics(font, (*c->ftb->get_caption)(c), &sw, &sh);
 	border = 2 * SDLPUI_DEFAULT_CTRL_BORDER;
 	nw = sw + border;
 	nh = sh + border;
@@ -502,12 +545,8 @@ static void query_label_natural_size(struct sdlpui_control *c,
 		int *width, int *height)
 {
 	TTF_Font *font = sdlpui_get_ttf(w);
-	struct sdlpui_label *lp;
 
-	SDL_assert(c->type_code == SDLPUI_CTRL_LABEL && c->priv);
-	lp = c->priv;
-
-	sdlpui_get_utf8_metrics(font, lp->caption, width, height);
+	sdlpui_get_utf8_metrics(font, (*c->ftb->get_caption)(c), width, height);
 	*width += SDLPUI_DEFAULT_CTRL_BORDER * 2;
 	*height += SDLPUI_DEFAULT_CTRL_BORDER * 2;
 }
@@ -524,6 +563,22 @@ static void cleanup_label(struct sdlpui_control *c)
 }
 
 
+static const char *get_pb_type_name(const struct sdlpui_control *c)
+{
+	return "push button";
+}
+
+
+static const char *get_pb_caption(const struct sdlpui_control *c)
+{
+	struct sdlpui_label *pbp;
+
+	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
+	pbp = c->priv;
+	return pbp->caption;
+}
+
+
 static void change_pb_caption(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const char *new_caption)
@@ -535,7 +590,7 @@ static void change_pb_caption(struct sdlpui_control *c,
 	SDL_free(pbp->caption);
 	pbp->caption = SDL_strdup(new_caption);
 	resize_pb(c, d, w, c->rect.w, c->rect.h);
-	d->dirty = true;
+	d->dirty = SDL_TRUE;
 	sdlpui_signal_redraw(w);
 }
 
@@ -552,8 +607,9 @@ static void render_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
-	SDLPUI_RENDER_TRACER("push button", c, pbp->caption, c->rect,
-		pbp->caption_rect, d->texture);
+	SDLPUI_RENDER_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), c->rect, pbp->caption_rect,
+		d->texture);
 
 	/*
 	 * Always draw a border.  There's one pixel between these to leave
@@ -615,7 +671,8 @@ static void render_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 			dst_r.x += d->rect.x;
 			dst_r.y += d->rect.y;
 		}
-		sdlpui_render_utf8_line(r, font, fg, &dst_r, pbp->caption);
+		sdlpui_render_utf8_line(r, font, fg, &dst_r,
+			(*c->ftb->get_caption)(c));
 	}
 
 	if (pbp->disabled) {
@@ -644,14 +701,15 @@ static void respond_default_pb(struct sdlpui_control *c,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (!pbp->disabled && pbp->callback) {
-		SDLPUI_EVENT_TRACER("push button", c, pbp->caption,
-			"default action invoked");
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "default action invoked");
 		(pbp->callback)(c, d, w);
 	} else {
-		SDLPUI_EVENT_TRACER("push button", c, pbp->caption,
-			(pbp->disabled) ?
-				((pbp->callback) ? "default action suppressed; disable yes, callback available" : "default action suppressed; disable yes, callback unavailable") :
-				((pbp->callback) ? "default action suppressed; disable no, callback available" : "default action suppressed; disable no, callback unavailable"));
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c),
+			(pbp->disabled)
+			? ((pbp->callback) ? "default action suppressed; disable yes, callback available" : "default action suppressed; disable yes, callback unavailable")
+			: ((pbp->callback) ? "default action suppressed; disable no, callback available" : "default action suppressed; disable no, callback unavailable"));
 	}
 }
 
@@ -665,10 +723,10 @@ static void gain_key_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (!pbp->has_key) {
-		SDLPUI_EVENT_TRACER("push button", c, pbp->caption,
-			"gained key focus");
-		pbp->has_key = true;
-		d->dirty = true;
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "gains key focus");
+		pbp->has_key = SDL_TRUE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
@@ -683,10 +741,10 @@ static void lose_key_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (pbp->has_key) {
-		SDLPUI_EVENT_TRACER("push button", c, pbp->caption,
-			"lost key focus");
-		pbp->has_key = false;
-		d->dirty = true;
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "loses key focus");
+		pbp->has_key = SDL_FALSE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
@@ -701,10 +759,10 @@ static void gain_mouse_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (!pbp->has_mouse) {
-		SDLPUI_EVENT_TRACER("push button", c, pbp->caption,
-			"gained mouse focus");
-		pbp->has_mouse = true;
-		d->dirty = true;
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "gains mouse focus");
+		pbp->has_mouse = SDL_TRUE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
@@ -719,10 +777,10 @@ static void lose_mouse_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (pbp->has_mouse) {
-		SDLPUI_EVENT_TRACER("push button", c, pbp->caption,
-			"lost mouse focus");
-		pbp->has_mouse = false;
-		d->dirty = true;
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "loses mouse focus");
+		pbp->has_mouse = SDL_FALSE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
@@ -736,8 +794,8 @@ static void arm_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (!pbp->armed) {
-		pbp->armed = true;
-		d->dirty = true;
+		pbp->armed = SDL_TRUE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
@@ -751,14 +809,15 @@ static void disarm_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	if (pbp->armed) {
-		pbp->armed = false;
-		d->dirty = true;
+		pbp->armed = SDL_FALSE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
 
 
-static int get_pb_interactable_component(struct sdlpui_control *c, bool first)
+static int get_pb_interactable_component(struct sdlpui_control *c,
+		SDL_bool first)
 {
 	struct sdlpui_push_button *pbp;
 
@@ -778,7 +837,7 @@ static void resize_pb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 
-	sdlpui_get_utf8_metrics(font, pbp->caption, &sw, &sh);
+	sdlpui_get_utf8_metrics(font, (*c->ftb->get_caption)(c), &sw, &sh);
 	border = 2 * (SDLPUI_DEFAULT_CTRL_BORDER + 2);
 	nw = sw + border;
 	nh = sh + border;
@@ -830,18 +889,14 @@ static void query_pb_natural_size(struct sdlpui_control *c,
 		int *height)
 {
 	TTF_Font *font = sdlpui_get_ttf(w);
-	struct sdlpui_push_button *pbp;
 
-	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
-	pbp = c->priv;
-
-	sdlpui_get_utf8_metrics(font, pbp->caption, width, height);
+	sdlpui_get_utf8_metrics(font, (*c->ftb->get_caption)(c), width, height);
 	*width += (SDLPUI_DEFAULT_CTRL_BORDER + 2) * 2;
 	*height += (SDLPUI_DEFAULT_CTRL_BORDER + 2) * 2;
 }
 
 
-static bool is_pb_disabled(const struct sdlpui_control *c)
+static SDL_bool is_pb_disabled(const struct sdlpui_control *c)
 {
 	const struct sdlpui_push_button *pbp;
 
@@ -851,18 +906,19 @@ static bool is_pb_disabled(const struct sdlpui_control *c)
 }
 
 
-static bool set_pb_disabled(struct sdlpui_control *c, struct sdlpui_dialog *d,
-		struct sdlpui_window *w, bool disabled)
+static SDL_bool set_pb_disabled(struct sdlpui_control *c,
+		struct sdlpui_dialog *d, struct sdlpui_window *w,
+		SDL_bool disabled)
 {
 	struct sdlpui_push_button *pbp;
-	bool old_value;
+	SDL_bool old_value;
 
 	SDL_assert(c->type_code == SDLPUI_CTRL_PUSH_BUTTON && c->priv);
 	pbp = c->priv;
 	old_value = pbp->disabled;
-	if (old_value != disabled) {
-		pbp->disabled = disabled;
-		d->dirty = true;
+	if (!old_value != !disabled) {
+		pbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 	return old_value;
@@ -913,8 +969,8 @@ static void help_mb_popup_submenu(struct sdlpui_control *c,
 	mbp = c->priv;
 	SDL_assert(mbp->subtype_code == SDLPUI_MB_SUBMENU);
 
-	SDLPUI_EVENT_TRACER("menu submenu button", c, mbp->caption,
-		"popping up child menu");
+	SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), "popping up child menu");
 
 	ul_x_win = d->rect.x + c->rect.x;
 	ul_y_win = d->rect.y + c->rect.y;
@@ -945,13 +1001,13 @@ static void help_mb_popup_submenu(struct sdlpui_control *c,
 	(*d->ftb->set_child)(d, mbp->v.submenu.child);
 	if (mbp->v.submenu.child->pop_callback) {
 		(*mbp->v.submenu.child->pop_callback)(mbp->v.submenu.child,
-			w, true);
+			w, SDL_TRUE);
 	}
 	sdlpui_dialog_push_to_top(w, mbp->v.submenu.child);
 }
 
 
-static bool handle_mb_mousemove(struct sdlpui_control *c,
+static SDL_bool handle_mb_mousemove(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_MouseMotionEvent *e)
 {
@@ -960,13 +1016,13 @@ static bool handle_mb_mousemove(struct sdlpui_control *c,
 	 * to the point that the mouse leaves the window).
 	 */
 	if (e->state != 0) {
-		return true;
+		return SDL_TRUE;
 	}
 	if (sdlpui_is_in_control(c, d, e->x, e->y)) {
 		/*
 		 * ranged_int buttons care whether the mouse is in the left or
 		 * right side of the button.  Otherwise, motion within the
-		 * button doesn't matter.
+		 * button does not matter.
 		 */
 		struct sdlpui_menu_button *mbp;
 
@@ -984,90 +1040,52 @@ static bool handle_mb_mousemove(struct sdlpui_control *c,
 			}
 			if (old != mbp->has_mouse) {
 				if (!mbp->has_mouse) {
-#ifdef SDLPUI_TRACE_EVENTS
-					size_t ecap_sz =
-						SDL_strlen(mbp->caption) + 16;
-					char *ecap = SDL_malloc(ecap_sz);
-
-					(void)SDL_snprintf(ecap, ecap_sz,
-						mbp->caption,
-						mbp->v.ranged_int.curr);
-					SDLPUI_EVENT_TRACER("menu ranged int",
-						c, ecap, "lost mouse focus");
-					SDL_free(ecap);
-#endif
+					SDLPUI_EVENT_TRACER(
+						(*c->ftb->get_type_name)(c),
+						c, (*c->ftb->get_caption)(c),
+						"loses mouse focus");
 					d->c_mouse = NULL;
 				} else if (!old) {
-#ifdef SDLPUI_TRACE_EVENTS
-					size_t ecap_sz =
-						SDL_strlen(mbp->caption) + 16;
-					char *ecap = SDL_malloc(ecap_sz);
-
-					(void)SDL_snprintf(ecap, ecap_sz,
-						mbp->caption,
-						mbp->v.ranged_int.curr);
-					SDLPUI_EVENT_TRACER("menu ranged int",
-						c, ecap, "gained mouse focus");
-					SDL_free(ecap);
-#endif
+					SDLPUI_EVENT_TRACER(
+						(*c->ftb->get_type_name)(c),
+						c, (*c->ftb->get_caption)(c),
+						"gains mouse focus");
 					d->c_mouse = c;
 				}
 				/* Have keyboard focus follow the mouse. */
 				if (mbp->has_key != mbp->has_mouse) {
 					if (!mbp->has_mouse) {
-#ifdef SDLPUI_TRACE_EVENTS
-						size_t ecap_sz =
-							SDL_strlen(mbp->caption)
-							+ 16;
-						char *ecap =
-							SDL_malloc(ecap_sz);
-
-						(void)SDL_snprintf(ecap,
-							ecap_sz, mbp->caption,
-							mbp->v.ranged_int.curr);
 						SDLPUI_EVENT_TRACER(
-							"menu ranged int",
-							c, ecap,
-							"lost key focus");
-						SDL_free(ecap);
-#endif
+							(*c->ftb->get_type_name)(c),
+							c,
+							(*c->ftb->get_caption)(c),
+							"loses key focus");
 						d->c_key = NULL;
 					} else if (!mbp->has_key) {
-#ifdef SDLPUI_TRACE_EVENTS
-						size_t ecap_sz =
-							SDL_strlen(mbp->caption)
-							+ 16;
-						char *ecap =
-							SDL_malloc(ecap_sz);
-
-						(void)SDL_snprintf(ecap,
-							ecap_sz, mbp->caption,
-							mbp->v.ranged_int.curr);
 						SDLPUI_EVENT_TRACER(
-							"menu ranged int",
-							c, ecap,
-							"gained key focus");
-						SDL_free(ecap);
-#endif
+							(*c->ftb->get_type_name)(c),
+							c,
+							(*c->ftb->get_caption)(c),
+							"gains key focus");
 						d->c_key = c;
 					}
 					mbp->has_key = mbp->has_mouse;
 				}
-				d->dirty = true;
+				d->dirty = SDL_TRUE;
 				sdlpui_signal_redraw(w);
 			}
 		}
-		return true;
+		return SDL_TRUE;
 	}
 	/*
 	 * Otherwise, let the dialog handle the motion to see if it enters
 	 * another control.
 	 */
-	return false;
+	return SDL_FALSE;
 }
 
 
-static bool handle_mb_mousewheel(struct sdlpui_control *c,
+static SDL_bool handle_mb_mousewheel(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_MouseWheelEvent *e)
 {
@@ -1083,7 +1101,7 @@ static bool handle_mb_mousewheel(struct sdlpui_control *c,
 	 * doing anything.
 	 */
 	if (mbp->subtype_code != SDLPUI_MB_RANGED_INT) {
-		return true;
+		return SDL_TRUE;
 	}
 
 	change = e->y;
@@ -1106,36 +1124,78 @@ static bool handle_mb_mousewheel(struct sdlpui_control *c,
 		result = mbp->v.ranged_int.max;
 	}
 	if (mbp->v.ranged_int.curr != result) {
-#ifdef SDLPUI_TRACE_EVENTS
-		size_t ecap_sz = SDL_strlen(mbp->caption) + 16;
-		char *ecap = SDL_malloc(ecap_sz);
-
-		(void)SDL_snprintf(ecap, ecap_sz, mbp->caption,
-			mbp->v.ranged_int.curr);
-		SDLPUI_EVENT_TRACER("menu ranged int", c, ecap,
-			"value changed by mouse wheel");
-		SDL_free(ecap);
-#endif
+		if (mbp->v.ranged_int.expanded_caption) {
+			SDL_free(mbp->v.ranged_int.expanded_caption);
+			mbp->v.ranged_int.expanded_caption = NULL;
+		}
 		mbp->v.ranged_int.old = mbp->v.ranged_int.curr;
 		mbp->v.ranged_int.curr = (int)result;
-		d->dirty = true;
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c),
+			"value changed by mouse wheel");
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 		if (mbp->callback) {
 			(*mbp->callback)(c, d, w);
 		}
 	} else {
-#ifdef SDLPUI_TRACE_EVENTS
-		size_t ecap_sz = SDL_strlen(mbp->caption) + 16;
-		char *ecap = SDL_malloc(ecap_sz);
-
-		(void)SDL_snprintf(ecap, ecap_sz, mbp->caption,
-			mbp->v.ranged_int.curr);
-		SDLPUI_EVENT_TRACER("menu ranged int", c, ecap,
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c),
 			"value left as is by mouse wheel");
-		SDL_free(ecap);
-#endif
 	}
-	return true;
+	return SDL_TRUE;
+}
+
+
+static const char *get_mb_type_name(const struct sdlpui_control *c)
+{
+	struct sdlpui_menu_button *mbp;
+
+	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
+	mbp = c->priv;
+	switch (mbp->subtype_code) {
+	case SDLPUI_MB_INVALID:
+		return "menu invalid entry";
+
+	case SDLPUI_MB_NONE:
+		return "menu button";
+
+	case SDLPUI_MB_INDICATOR:
+		return "menu indicator";
+
+	case SDLPUI_MB_RANGED_INT:
+		return "menu ranged int";
+
+	case SDLPUI_MB_SUBMENU:
+		return "menu submenu button";
+
+	case SDLPUI_MB_TOGGLE:
+		return "menu toggle";
+
+	default:
+		return "menu unknown entry";
+	}
+}
+
+
+static const char *get_mb_caption(const struct sdlpui_control *c)
+{
+	struct sdlpui_menu_button *mbp;
+
+	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
+	mbp = c->priv;
+	if (mbp->subtype_code != SDLPUI_MB_RANGED_INT) {
+		return mbp->caption;
+	}
+	if (!mbp->v.ranged_int.expanded_caption) {
+		size_t ecap_sz = SDL_strlen(mbp->caption) + 16;
+
+		mbp->v.ranged_int.expanded_caption = SDL_malloc(ecap_sz);
+		(void)SDL_snprintf(mbp->v.ranged_int.expanded_caption,
+			ecap_sz, mbp->caption, mbp->v.ranged_int.curr);
+
+	}
+	return mbp->v.ranged_int.expanded_caption;
 }
 
 
@@ -1149,8 +1209,13 @@ static void change_mb_caption(struct sdlpui_control *c,
 	mbp = c->priv;
 	SDL_free(mbp->caption);
 	mbp->caption = SDL_strdup(new_caption);
+	if (mbp->subtype_code == SDLPUI_MB_RANGED_INT
+			&& mbp->v.ranged_int.expanded_caption) {
+		SDL_free(mbp->v.ranged_int.expanded_caption);
+		mbp->v.ranged_int.expanded_caption = NULL;
+	}
 	resize_mb(c, d, w, c->rect.w, c->rect.h);
-	d->dirty = true;
+	d->dirty = SDL_TRUE;
 	sdlpui_signal_redraw(w);
 }
 
@@ -1166,8 +1231,9 @@ static void render_mb(struct sdlpui_control *c,
 
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
-	SDLPUI_RENDER_TRACER("menu button", c, mbp->caption, c->rect,
-		mbp->caption_rect, d->texture);
+	SDLPUI_RENDER_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), c->rect, mbp->caption_rect,
+		d->texture);
 
 	SDL_SetRenderDrawColor(r, fg->r, fg->g, fg->b, fg->a);
 
@@ -1179,19 +1245,8 @@ static void render_mb(struct sdlpui_control *c,
 			dst_r.x += d->rect.x;
 			dst_r.y += d->rect.y;
 		}
-		if (mbp->subtype_code != SDLPUI_MB_RANGED_INT) {
-			sdlpui_render_utf8_line(r, font, fg, &dst_r,
-				mbp->caption);
-		} else {
-			/* Fill in the current value in the caption. */
-			size_t ecap_sz = SDL_strlen(mbp->caption) + 16;
-			char *ecap = SDL_malloc(ecap_sz);
-
-			(void)SDL_snprintf(ecap, ecap_sz, mbp->caption,
-				mbp->v.ranged_int.curr);
-			sdlpui_render_utf8_line(r, font, fg, &dst_r, ecap);
-			SDL_free(ecap);
-		}
+		sdlpui_render_utf8_line(r, font, fg, &dst_r,
+			(*c->ftb->get_caption)(c));
 
 		if ((mbp->subtype_code == SDLPUI_MB_TOGGLE
 				|| mbp->subtype_code == SDLPUI_MB_INDICATOR)
@@ -1367,12 +1422,14 @@ static void respond_default_mb(struct sdlpui_control *c,
 				sdlpui_get_dialog_child(d);
 
 			if (other_child) {
-				sdlpui_popdown_dialog(other_child, w, false);
+				sdlpui_popdown_dialog(other_child, w,
+					SDL_FALSE);
 			}
 			help_mb_popup_submenu(c, d, w);
 		} else {
-			SDLPUI_EVENT_TRACER("menu submenu button", c,
-				mbp->caption, "child menu already displayed");
+			SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+				(*c->ftb->get_caption)(c),
+				"child menu already displayed");
 		}
 		/* Give the first button in the child menu keyboard focus. */
 		if (mbp->v.submenu.child->ftb->goto_first_control) {
@@ -1404,40 +1461,30 @@ static void respond_default_mb(struct sdlpui_control *c,
 			newi = mbp->v.ranged_int.max;
 		}
 		if (newi == mbp->v.ranged_int.curr) {
-#ifdef SDLPUI_TRACE_EVENTS
-			size_t ecap_sz = SDL_strlen(mbp->caption) + 16;
-			char *ecap = SDL_malloc(ecap_sz);
-
-			(void)SDL_snprintf(ecap, ecap_sz, mbp->caption,
-				mbp->v.ranged_int.curr);
-			SDLPUI_EVENT_TRACER("menu ranged int", c, ecap,
+			SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+				(*c->ftb->get_caption)(c),
 				"left unchanged by default response");
-			SDL_free(ecap);
-#endif
 			return;
 		}
-#ifdef SDLPUI_TRACE_EVENTS
-		{
-			size_t ecap_sz = SDL_strlen(mbp->caption) + 16;
-			char *ecap = SDL_malloc(ecap_sz);
-
-			(void)SDL_snprintf(ecap, ecap_sz, mbp->caption, newi);
-			SDLPUI_EVENT_TRACER("menu ranged int", c, ecap,
-				"changed by default response");
-			SDL_free(ecap);
+		if (mbp->v.ranged_int.expanded_caption) {
+			SDL_free(mbp->v.ranged_int.expanded_caption);
+			mbp->v.ranged_int.expanded_caption = NULL;
 		}
-#endif
 		mbp->v.ranged_int.old = mbp->v.ranged_int.curr;
 		mbp->v.ranged_int.curr = newi;
-		d->dirty = true;
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c),
+			"changed by default response");
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 		break;
 
 	case SDLPUI_MB_TOGGLE:
-		SDLPUI_EVENT_TRACER("menu toggle", c, mbp->caption,
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c),
 			"changed by default response");
 		mbp->v.toggled = !mbp->v.toggled;
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 		break;
 
@@ -1460,8 +1507,8 @@ static void gain_key_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
 
-	SDLPUI_EVENT_TRACER("menu entry", c, mbp->caption,
-		"gained key focus");
+	SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), "gains key focus");
 	old = mbp->has_key;
 	if (mbp->subtype_code == SDLPUI_MB_RANGED_INT) {
 		if (comp_ind < 0) {
@@ -1476,7 +1523,7 @@ static void gain_key_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		mbp->has_key = 1;
 	}
 	if (old != mbp->has_key) {
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 	if (mbp->subtype_code == SDLPUI_MB_SUBMENU && !mbp->v.submenu.child) {
@@ -1495,10 +1542,10 @@ static void lose_key_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	mbp = c->priv;
 
 	if (mbp->has_key) {
-		SDLPUI_EVENT_TRACER("menu entry", c, mbp->caption,
-			"lost key focus");
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "loses key focus");
 		mbp->has_key = 0;
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 	/*
@@ -1507,9 +1554,9 @@ static void lose_key_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	 */
 	if (mbp->subtype_code == SDLPUI_MB_SUBMENU && mbp->v.submenu.child
 			&& (!new_d || !sdlpui_is_descendant_dialog(d, new_d))) {
-		SDLPUI_EVENT_TRACER("submenu entry", c, mbp->caption,
-			"popping down submenu");
-		sdlpui_popdown_dialog(mbp->v.submenu.child, w, false);
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "popping down submenu");
+		sdlpui_popdown_dialog(mbp->v.submenu.child, w, SDL_FALSE);
 		mbp->v.submenu.child = NULL;
 	}
 }
@@ -1524,8 +1571,8 @@ static void gain_mouse_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
 
-	SDLPUI_EVENT_TRACER("menu entry", c, mbp->caption,
-		"gained mouse focus");
+	SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), "gains mouse focus");
 	old = mbp->has_mouse;
 	if (mbp->subtype_code == SDLPUI_MB_RANGED_INT) {
 		if (comp_ind < 0) {
@@ -1540,7 +1587,7 @@ static void gain_mouse_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		mbp->has_mouse = 1;
 	}
 	if (old != mbp->has_mouse) {
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 	if (mbp->subtype_code == SDLPUI_MB_SUBMENU && !mbp->v.submenu.child) {
@@ -1560,10 +1607,10 @@ static void lose_mouse_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	mbp = c->priv;
 
 	if (mbp->has_mouse) {
-		SDLPUI_EVENT_TRACER("menu entry", c, mbp->caption,
-			"lost mouse focus");
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "loses mouse focus");
 		mbp->has_mouse = 0;
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 	/*
@@ -1572,9 +1619,9 @@ static void lose_mouse_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	 */
 	if (mbp->subtype_code == SDLPUI_MB_SUBMENU && mbp->v.submenu.child
 			&& (!new_d || !sdlpui_is_descendant_dialog(d, new_d))) {
-		SDLPUI_EVENT_TRACER("submenu entry", c, mbp->caption,
-			"popping down submenu");
-		sdlpui_popdown_dialog(mbp->v.submenu.child, w, false);
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(*c->ftb->get_caption)(c), "popping down submenu");
+		sdlpui_popdown_dialog(mbp->v.submenu.child, w, SDL_FALSE);
 		mbp->v.submenu.child = NULL;
 	}
 }
@@ -1604,7 +1651,8 @@ static void arm_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
 
-	SDLPUI_EVENT_TRACER("menu entry", c, mbp->caption, "arming");
+	SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), "arming");
 	old = mbp->armed;
 	if (mbp->subtype_code != SDLPUI_MB_RANGED_INT) {
 		mbp->armed = 1;
@@ -1619,7 +1667,7 @@ static void arm_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		}
 	}
 	if (old != mbp->armed) {
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
@@ -1634,7 +1682,8 @@ static void disarm_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
 
-	SDLPUI_EVENT_TRACER("menu entry", c, mbp->caption, "disarming");
+	SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+		(*c->ftb->get_caption)(c), "disarming");
 	old = mbp->armed;
 	if (mbp->subtype_code != SDLPUI_MB_RANGED_INT
 			|| hint == SDLPUI_ACTION_HINT_NONE) {
@@ -1647,13 +1696,14 @@ static void disarm_mb(struct sdlpui_control *c, struct sdlpui_dialog *d,
 		}
 	}
 	if (old != mbp->armed) {
-		d->dirty = true;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 }
 
 
-static int get_mb_interactable_component(struct sdlpui_control *c, bool first)
+static int get_mb_interactable_component(struct sdlpui_control *c,
+		SDL_bool first)
 {
 	struct sdlpui_menu_button *mbp;
 
@@ -1683,7 +1733,7 @@ static int get_mb_interactable_component(struct sdlpui_control *c, bool first)
 }
 
 
-static bool step_within_mb(struct sdlpui_control *c, bool forward)
+static SDL_bool step_within_mb(struct sdlpui_control *c, SDL_bool forward)
 {
 	struct sdlpui_menu_button *mbp;
 
@@ -1696,17 +1746,17 @@ static bool step_within_mb(struct sdlpui_control *c, bool forward)
 			if (mbp->has_key == 1 && mbp->v.ranged_int.curr
 					< mbp->v.ranged_int.max) {
 				mbp->has_key = 2;
-				return true;
+				return SDL_TRUE;
 			}
 		} else {
 			if (mbp->has_key == 2 && mbp->v.ranged_int.curr
 					> mbp->v.ranged_int.min) {
 				mbp->has_key = 1;
-				return true;
+				return SDL_TRUE;
 			}
 		}
 	}
-	return false;
+	return SDL_FALSE;
 }
 
 
@@ -1864,7 +1914,7 @@ static void query_mb_natural_size(struct sdlpui_control *c,
 }
 
 
-static bool is_mb_disabled(const struct sdlpui_control *c)
+static SDL_bool is_mb_disabled(const struct sdlpui_control *c)
 {
 	const struct sdlpui_menu_button *mbp;
 
@@ -1874,18 +1924,19 @@ static bool is_mb_disabled(const struct sdlpui_control *c)
 }
 
 
-static bool set_mb_disabled(struct sdlpui_control *c, struct sdlpui_dialog *d,
-		struct sdlpui_window *w, bool disabled)
+static SDL_bool set_mb_disabled(struct sdlpui_control *c,
+		struct sdlpui_dialog *d, struct sdlpui_window *w,
+		SDL_bool disabled)
 {
 	struct sdlpui_menu_button *mbp;
-	bool old_value;
+	SDL_bool old_value;
 
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
 	old_value = mbp->disabled;
-	if (old_value != disabled) {
-		mbp->disabled = disabled;
-		d->dirty = true;
+	if (!old_value != !disabled) {
+		mbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
+		d->dirty = SDL_TRUE;
 		sdlpui_signal_redraw(w);
 	}
 	return old_value;
@@ -1922,6 +1973,10 @@ static void cleanup_mb(struct sdlpui_control *c)
 	SDL_assert(c->type_code == SDLPUI_CTRL_MENU_BUTTON && c->priv);
 	mbp = c->priv;
 	SDL_free(mbp->caption);
+	if (mbp->subtype_code == SDLPUI_MB_RANGED_INT
+			&& mbp->v.ranged_int.expanded_caption) {
+		SDL_free(mbp->v.ranged_int.expanded_caption);
+	}
 	SDL_free(mbp);
 }
 
@@ -1935,17 +1990,17 @@ static void cleanup_mb(struct sdlpui_control *c)
  * corner, to test.
  * \param y is the vertical coordinate, relative to the window's upper left
  * corner, to test.
- * \return true if (x, y) is in the control and false otherwise.
+ * \return SDL_TRUE if (x, y) is in the control and SDL_FALSE otherwise.
  */
-bool sdlpui_is_in_control(const struct sdlpui_control *c,
+SDL_bool sdlpui_is_in_control(const struct sdlpui_control *c,
 		const struct sdlpui_dialog *d, Sint32 x, Sint32 y)
 {
 	if (x < d->rect.x + c->rect.x || y < d->rect.y + c->rect.y
 			|| x >= d->rect.x + c->rect.x + c->rect.w
 			|| y >= d->rect.y + c->rect.y + c->rect.h) {
-		return false;
+		return SDL_FALSE;
 	}
-	return true;
+	return SDL_TRUE;
 }
 
 
@@ -1954,11 +2009,11 @@ bool sdlpui_is_in_control(const struct sdlpui_control *c,
  *
  * \param c is the control to query.
  * \return whether or not the control is disabled.  If the control does not
- * support being disabled/enabled, the return value will be false.
+ * support being disabled/enabled, the return value will be SDL_FALSE.
  */
-bool sdlpui_is_disabled(const struct sdlpui_control *c)
+SDL_bool sdlpui_is_disabled(const struct sdlpui_control *c)
 {
-	return (c->ftb->is_disabled) ? (*c->ftb->is_disabled)(c) : false;
+	return (c->ftb->is_disabled) ? (*c->ftb->is_disabled)(c) : SDL_FALSE;
 }
 
 
@@ -1971,13 +2026,13 @@ bool sdlpui_is_disabled(const struct sdlpui_control *c)
  * \param disabled is whether the control should be disabled or not.
  * \return whether or not the prior state of the control was disabled.  If
  * the control does not support changing the disabled/enabled state, the
- * return value will be false.
+ * return value will be SDL_FALSE.
  */
-bool sdlpui_set_disabled(struct sdlpui_control *c, struct sdlpui_dialog *d,
-		struct sdlpui_window *w, bool disabled)
+SDL_bool sdlpui_set_disabled(struct sdlpui_control *c, struct sdlpui_dialog *d,
+		struct sdlpui_window *w, SDL_bool disabled)
 {
 	return (c->ftb->set_disabled) ?
-		(*c->ftb->set_disabled)(c, d, w, disabled) : false;
+		(*c->ftb->set_disabled)(c, d, w, disabled) : SDL_FALSE;
 }
 
 
@@ -2039,10 +2094,10 @@ void sdlpui_change_caption(struct sdlpui_control *c, struct sdlpui_dialog *d,
  * \param d is the dialog containing the control.
  * \param w is the window containing the dialog.
  * \param e is the event to handle.
- * \return true if the event is handled and doesn't need further processing by
- * the dialog; otherwise return false.
+ * \return SDL_TRUE if the event is handled and does not need further
+ * processing by the dialog; otherwise return SDL_FALSE.
  */
-bool sdlpui_control_handle_key(struct sdlpui_control *c,
+SDL_bool sdlpui_control_handle_key(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_KeyboardEvent *e)
 {
@@ -2065,8 +2120,11 @@ bool sdlpui_control_handle_key(struct sdlpui_control *c,
 			}
 			if (mods == KMOD_NONE) {
 				if (c->ftb->respond_default) {
-					SDLPUI_EVENT_TRACER("control", c,
-						"(not extracted)",
+					SDLPUI_EVENT_TRACER(
+						(*c->ftb->get_type_name)(c), c,
+						(c->ftb->get_caption)
+						? (*c->ftb->get_caption)(c)
+						: "(none)",
 						"invoking default reponse");
 					(*c->ftb->respond_default)(c, d, w,
 						SDLPUI_ACTION_HINT_KEY);
@@ -2078,11 +2136,11 @@ bool sdlpui_control_handle_key(struct sdlpui_control *c,
 				}
 			}
 		}
-		return true;
+		return SDL_TRUE;
 	}
 
 	/* Let the containing dialog handle everything else. */
-	return false;
+	return SDL_FALSE;
 }
 
 
@@ -2096,10 +2154,10 @@ bool sdlpui_control_handle_key(struct sdlpui_control *c,
  * \param d is the dialog containing the control.
  * \param w is the window containing the dialog.
  * \param e is the event to handle.
- * \return true if the event is handled and doesn't need further processing by
- * the dialog; otherwise return false.
+ * \return SDL_TRUE if the event is handled and does not need further
+ * processing by the dialog; otherwise return SDL_FALSE.
  */
-bool sdlpui_control_handle_mouseclick(struct sdlpui_control *c,
+SDL_bool sdlpui_control_handle_mouseclick(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_MouseButtonEvent *e)
 {
@@ -2115,8 +2173,10 @@ bool sdlpui_control_handle_mouseclick(struct sdlpui_control *c,
 					SDLPUI_ACTION_HINT_MOUSE);
 			}
 			if (c->ftb->respond_default) {
-				SDLPUI_EVENT_TRACER("control", c,
-					"(not extracted)",
+				SDLPUI_EVENT_TRACER(
+					(*c->ftb->get_type_name)(c), c,
+					(c->ftb->get_caption)
+					? (*c->ftb->get_caption)(c) : "(none)",
 					"invoking default response");
 				(*c->ftb->respond_default)(c, d, w,
 					SDLPUI_ACTION_HINT_MOUSE);
@@ -2124,7 +2184,7 @@ bool sdlpui_control_handle_mouseclick(struct sdlpui_control *c,
 		}
 	}
 	/* Swallow the event, even if nothing was done. */
-	return true;
+	return SDL_TRUE;
 }
 
 
@@ -2138,10 +2198,10 @@ bool sdlpui_control_handle_mouseclick(struct sdlpui_control *c,
  * \param d is the dialog containing the control.
  * \param w is the window containing the dialog.
  * \param e is the event to handle.
- * \return true if the event is handled and doesn't need further processing by
- * the dialog; otherwise return false.
+ * \return SDL_TRUE if the event is handled and does not need further
+ * processing by the dialog; otherwise return SDL_FALSE.
  */
-bool sdlpui_control_handle_mousemove(struct sdlpui_control *c,
+SDL_bool sdlpui_control_handle_mousemove(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w,
 		const struct SDL_MouseMotionEvent *e)
 {
@@ -2151,13 +2211,13 @@ bool sdlpui_control_handle_mousemove(struct sdlpui_control *c,
 	 * is moving within the control, it also does nothing.
 	 */
 	if (e->state != 0 || sdlpui_is_in_control(c, d, e->x, e->y)) {
-		return true;
+		return SDL_TRUE;
 	}
 	/*
 	 * Otherwise, let the dialog handle the motion to see if it enters
 	 * another control.
 	 */
-	return false;
+	return SDL_FALSE;
 }
 
 
@@ -2173,7 +2233,9 @@ void sdlpui_invoke_dialog_default_action(struct sdlpui_control *c,
 		struct sdlpui_dialog *d, struct sdlpui_window *w)
 {
 	if (d->ftb->respond_default) {
-		SDLPUI_EVENT_TRACER("control", c, "(not extracted)",
+		SDLPUI_EVENT_TRACER((*c->ftb->get_type_name)(c), c,
+			(c->ftb->get_caption) ? (*c->ftb->get_caption)(c)
+			: "(none)",
 			"invoking containing dialog's default action");
 		(*d->ftb->respond_default)(d, w);
 	}
@@ -2264,9 +2326,9 @@ void sdlpui_create_label(struct sdlpui_control *c, const char *caption,
  * may be NULL.
  * \param tag is a value the application can use as it wishes to have buttons
  * with the same callback act differently.
- * \param disabled will, if true, cause the button to ignore button or keyboard
- * events and be displayed with an altered appearance until the button is
- * reenabled.
+ * \param disabled will, if not SDL_FALSE, cause the button to ignore button or
+ * keyboard events and be displayed with an altered appearance until the
+ * button is reenabled.
  *
  * Note that the bounding rectangle for the control is not set.  The caller
  * should use c->ftb->resize to set that (perhaps in conjunction with
@@ -2276,7 +2338,7 @@ void sdlpui_create_label(struct sdlpui_control *c, const char *caption,
 void sdlpui_create_push_button(struct sdlpui_control *c, const char *caption,
 		enum sdlpui_hor_align halign, void (*callback)(
 		struct sdlpui_control*, struct sdlpui_dialog*,
-		struct sdlpui_window*), int tag, bool disabled)
+		struct sdlpui_window*), int tag, SDL_bool disabled)
 {
 	struct sdlpui_push_button *pbp = SDL_malloc(sizeof(*pbp));
 
@@ -2284,10 +2346,10 @@ void sdlpui_create_push_button(struct sdlpui_control *c, const char *caption,
 	pbp->callback = callback;
 	pbp->halign = halign;
 	pbp->tag = tag;
-	pbp->disabled = disabled;
-	pbp->has_key = false;
-	pbp->has_mouse = false;
-	pbp->armed = false;
+	pbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
+	pbp->has_key = SDL_FALSE;
+	pbp->has_mouse = SDL_FALSE;
+	pbp->armed = SDL_FALSE;
 	c->ftb = &push_button_funcs;
 	c->priv = pbp;
 	c->type_code = SDLPUI_CTRL_PUSH_BUTTON;
@@ -2307,9 +2369,9 @@ void sdlpui_create_push_button(struct sdlpui_control *c, const char *caption,
  * may be NULL.
  * \param tag is a value the application can use as it wishes to have buttons
  * with the same callback act differently.
- * \param disabled will, if true, cause the button to ignore button or keyboard
- * events and be displayed with an altered appearance until the button is
- * reenabled.
+ * \param disabled will, if not SDL_FALSE, cause the button to ignore button or
+ * keyboard events and be displayed with an altered appearance until the
+ * button is reenabled.
  *
  * Note that the bounding rectangle for the control is not set.  The caller
  * should use c->ftb->resize to set that (perhaps in conjunction with
@@ -2319,7 +2381,7 @@ void sdlpui_create_push_button(struct sdlpui_control *c, const char *caption,
 void sdlpui_create_menu_button(struct sdlpui_control *c, const char *caption,
 		enum sdlpui_hor_align halign, void (*callback)(
 		struct sdlpui_control*, struct sdlpui_dialog*,
-		struct sdlpui_window*w), int tag, bool disabled)
+		struct sdlpui_window *w), int tag, SDL_bool disabled)
 {
 	struct sdlpui_menu_button *mbp = SDL_malloc(sizeof(*mbp));
 
@@ -2330,7 +2392,7 @@ void sdlpui_create_menu_button(struct sdlpui_control *c, const char *caption,
 	mbp->has_key = 0;
 	mbp->has_mouse = 0;
 	mbp->armed = 0;
-	mbp->disabled = disabled;
+	mbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
 	mbp->subtype_code = SDLPUI_MB_NONE;
 	c->ftb = &menu_button_funcs;
 	c->priv = mbp;
@@ -2357,7 +2419,7 @@ void sdlpui_create_menu_button(struct sdlpui_control *c, const char *caption,
  * position the control in a dialog.
  */
 void sdlpui_create_menu_indicator(struct sdlpui_control *c, const char *caption,
-		enum sdlpui_hor_align halign, int tag, bool curr_value)
+		enum sdlpui_hor_align halign, int tag, SDL_bool curr_value)
 {
 	struct sdlpui_menu_button *mbp = SDL_malloc(sizeof(*mbp));
 
@@ -2368,9 +2430,9 @@ void sdlpui_create_menu_indicator(struct sdlpui_control *c, const char *caption,
 	mbp->has_key = 0;
 	mbp->has_mouse = 0;
 	mbp->armed = 0;
-	mbp->disabled = false;
+	mbp->disabled = SDL_FALSE;
 	mbp->subtype_code = SDLPUI_MB_INDICATOR;
-	mbp->v.toggled = curr_value;
+	mbp->v.toggled = (curr_value) ? SDL_TRUE : SDL_FALSE;
 	c->ftb = &menu_button_funcs;
 	c->priv = mbp;
 	c->type_code = SDLPUI_CTRL_MENU_BUTTON;
@@ -2391,9 +2453,9 @@ void sdlpui_create_menu_indicator(struct sdlpui_control *c, const char *caption,
  * button changes due to a user interface event.  It may be NULL.
  * \param tag is a value the application can use as it wishes to have buttons
  * with the same callback act differently.
- * \param disabled will, if true, cause the button to ignore button or keyboard
- * events and be displayed with an altered appearance until the button is
- * reenabled.
+ * \param disabled will, if not SDL_FALSE, cause the button to ignore button or
+ * keyboard events and be displayed with an altered appearance until the
+ * button is reenabled.
  * \param curr_value is the current value for the integer associated with the
  * button.
  * \param min_value is the minimum value for the integer associated with the
@@ -2409,8 +2471,8 @@ void sdlpui_create_menu_indicator(struct sdlpui_control *c, const char *caption,
 void sdlpui_create_menu_ranged_int(struct sdlpui_control *c,
 		const char *caption, enum sdlpui_hor_align halign,
 		void (*callback)(struct sdlpui_control*, struct sdlpui_dialog*,
-		struct sdlpui_window*), int tag, bool disabled, int curr_value,
-		int min_value, int max_value)
+		struct sdlpui_window*), int tag, SDL_bool disabled,
+		int curr_value, int min_value, int max_value)
 {
 	struct sdlpui_menu_button *mbp = SDL_malloc(sizeof(*mbp));
 
@@ -2421,8 +2483,9 @@ void sdlpui_create_menu_ranged_int(struct sdlpui_control *c,
 	mbp->has_key = 0;
 	mbp->has_mouse = 0;
 	mbp->armed = 0;
-	mbp->disabled = disabled;
+	mbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
 	mbp->subtype_code = SDLPUI_MB_RANGED_INT;
+	mbp->v.ranged_int.expanded_caption = NULL;
 	mbp->v.ranged_int.min = min_value;
 	mbp->v.ranged_int.max = max_value;
 	mbp->v.ranged_int.curr = curr_value;
@@ -2447,9 +2510,9 @@ void sdlpui_create_menu_ranged_int(struct sdlpui_control *c,
  * may be NULL.
  * \param tag is a value the application can use as it wishes to have buttons
  * with the same callback act differently.
- * \param disabled will, if true, cause the button to ignore button or keyboard
- * events and be displayed with an altered appearance until the button is
- * reenabled.
+ * \param disabled will, if not SDL_FALSE, cause the button to ignore button or
+ * keyboard events and be displayed with an altered appearance until the
+ * button is reenabled.
  * \param curr_value is whether the toggle is currently on.
  *
  * Note that the bounding rectangle for the control is not set.  The caller
@@ -2460,8 +2523,8 @@ void sdlpui_create_menu_ranged_int(struct sdlpui_control *c,
 void sdlpui_create_menu_toggle(struct sdlpui_control *c, const char *caption,
 		enum sdlpui_hor_align halign, void (*callback)(
 		struct sdlpui_control*, struct sdlpui_dialog*,
-		struct sdlpui_window*), int tag, bool disabled,
-		bool curr_value)
+		struct sdlpui_window*), int tag, SDL_bool disabled,
+		SDL_bool curr_value)
 {
 	struct sdlpui_menu_button *mbp = SDL_malloc(sizeof(*mbp));
 
@@ -2472,9 +2535,9 @@ void sdlpui_create_menu_toggle(struct sdlpui_control *c, const char *caption,
 	mbp->has_key = 0;
 	mbp->has_mouse = 0;
 	mbp->armed = 0;
-	mbp->disabled = disabled;
+	mbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
 	mbp->subtype_code = SDLPUI_MB_TOGGLE;
-	mbp->v.toggled = curr_value;
+	mbp->v.toggled = (curr_value) ? SDL_TRUE : SDL_FALSE;
 	c->ftb = &menu_button_funcs;
 	c->priv = mbp;
 	c->type_code = SDLPUI_CTRL_MENU_BUTTON;
@@ -2502,9 +2565,9 @@ void sdlpui_create_menu_toggle(struct sdlpui_control *c, const char *caption,
  * the menu button.
  * \param tag is a value the application can use as it wishes to have otherwise
  * similar buttons act differently.
- * \param disabled will, if true, cause the button to ignore button or keyboard
- * events and be displayed with an altered appearance until the button is
- * reenabled.
+ * \param disabled will, if not SDL_FALSE, cause the button to ignore button or
+ * keyboard events and be displayed with an altered appearance until the
+ * button is reenabled.
  *
  * Note that the bounding rectangle for the control is not set.  The caller
  * should use c->ftb->resize to set that (perhaps in conjunction with
@@ -2516,7 +2579,7 @@ void sdlpui_create_submenu_button(struct sdlpui_control *c, const char *caption,
 		struct sdlpui_control*, struct sdlpui_dialog*,
 		struct sdlpui_window*, int ul_x_win, int ul_y_win),
 		enum sdlpui_child_menu_placement placement, int tag,
-		bool disabled)
+		SDL_bool disabled)
 {
 	struct sdlpui_menu_button *mbp = SDL_malloc(sizeof(*mbp));
 
@@ -2527,7 +2590,7 @@ void sdlpui_create_submenu_button(struct sdlpui_control *c, const char *caption,
 	mbp->has_key = 0;
 	mbp->has_mouse = 0;
 	mbp->armed = 0;
-	mbp->disabled = disabled;
+	mbp->disabled = (disabled) ? SDL_TRUE : SDL_FALSE;
 	mbp->subtype_code = SDLPUI_MB_SUBMENU;
 	mbp->v.submenu.creator = creator;
 	mbp->v.submenu.child = NULL;
