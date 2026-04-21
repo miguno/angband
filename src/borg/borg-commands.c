@@ -360,10 +360,7 @@ static void get_cfg_display(struct menu* menu, int oid, bool cursor, int row,
     c_put_str(label_attr, borg_settings[oid].setting_string, row, col);
 
     if (borg_settings[oid].setting_type == 'b') {
-        if (borg_cfg[oid])
-            strcpy(value, "TRUE");
-        else
-            strcpy(value, "FALSE");
+        my_strcpy(value, (borg_cfg[oid]) ? "TRUE" : "FALSE", sizeof(value));
     }
     else { /* setting type i (integer) */
         snprintf(value, 30, "%d", borg_cfg[oid]);
@@ -1611,7 +1608,7 @@ void do_cmd_borg(void)
              * Force initialization or reinitialize if the game was closed
              * and restarted without exiting since the last initialization
              */
-            if (!borg_initialized) {
+            if (!borg_initialized || game_closed) {
                 if (borg_initialized) {
                     borg_free();
                 }

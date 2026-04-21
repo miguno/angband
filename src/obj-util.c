@@ -158,7 +158,7 @@ void flavor_init(void)
 	/* Use the "simple" RNG */
 	Rand_quick = true;
 
-	/* Induce consistant flavors */
+	/* Induce consistent flavors */
 	Rand_value = seed_flavor;
 
 	/* Scrub all flavors and re-parse for new players */
@@ -172,7 +172,9 @@ void flavor_init(void)
 			f->sval = SV_UNKNOWN;
 		}
 		cleanup_parser(&flavor_parser);
-		run_parser(&flavor_parser);
+		if (run_parser(&flavor_parser)) {
+			quit("Could not parse flavor.txt.");
+		}
 	}
 
 	if (OPT(player, birth_randarts))
