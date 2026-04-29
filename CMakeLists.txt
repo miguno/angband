@@ -503,9 +503,11 @@ endif()
 if(SUPPORT_STATS_BACKEND)
     include(src/cmake/macros/STATS_Backend.cmake)
     if(SUPPORT_STATS_FRONTEND)
-        configure_stats_backend(OurExecutable)
+        configure_stats_backend(OurExecutable NO)
+    else()
+        configure_stats_backend(OurExecutable YES)
     endif()
-    configure_stats_backend(OurCoreLib)
+    configure_stats_backend(OurCoreLib NO)
 endif()
 
 if(SUPPORT_TEST_FRONTEND)
@@ -606,23 +608,25 @@ if(BUILD_DOC)
         if(NOT (_DOC MATCHES "/$"))
             set(_DOC "${_DOC}/")
         endif()
-        set(_OUTDIR "${CMAKE_CURRENT_BINARY_DIR}/docs")
         unset(_COMMANDS)
         foreach(_X ${_FORMATS})
             # Strip out the format-specific subdirectory when transferring
             # so there's less nesting.  Works okay with only HTML output;
             # will there be name conflicts if multiple formats are used?
+            # Escape the generator expression to extract the executable's
+            # directory so it will not be expanded here but will be expanded
+            # in the add_custom_target() call below.
             list(
                 APPEND
                 _COMMANDS
                 "COMMAND" "${CMAKE_COMMAND}" "-E" "copy_directory"
                 "${_DOC}${_X}/"
-                "${_OUTDIR}"
+                "\$<TARGET_FILE_DIR:OurExecutable>/docs"
             )
         endforeach()
         add_custom_target(
             OurManualTransfer ALL
-            "${CMAKE_COMMAND}" "-E" "make_directory" "${_OUTDIR}"
+            "${CMAKE_COMMAND}" "-E" "make_directory" "$<TARGET_FILE_DIR:OurExecutable>/docs"
             ${_COMMANDS}
             VERBATIM
         )
@@ -1031,7 +1035,7 @@ foreach(ANGBAND_TEST_CASE_SOURCE ${ANGBAND_TEST_CASE_SOURCES})
         ${ANGBAND_CORE_LINK_LIBRARIES}
     )
     if(SUPPORT_STATS_BACKEND)
-        configure_stats_backend(${ANGBAND_TEST_CASE_NAME})
+        configure_stats_backend(${ANGBAND_TEST_CASE_NAME} NO)
     endif()
     if(SUPPORT_SDL_SOUND)
         configure_sdl_sound(${ANGBAND_TEST_CASE_NAME} NO)
