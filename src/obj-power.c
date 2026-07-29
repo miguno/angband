@@ -896,7 +896,7 @@ static int curse_power(const struct object *obj, int p, int verbose,
  *     1) Cause the be power to different than the 4.2.5 calculations when there
  *        are no weight-affecting curses present but obj->weight differs from
  *        obj->kind->weight.
- *     2) In the presense of weight-affecting curses, one would have to guard
+ *     2) In the presence of weight-affecting curses, one would have to guard
  *        against performing these calculations on curse objects (i.e.
  *        obj->kind->tval == curse_object_kind->tval
  *        && obj->kind->sval == curse_object_kind->sval) since the weights

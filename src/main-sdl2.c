@@ -736,7 +736,9 @@ static void log_window_details(int my_index, SDL_Window *w, SDL_Renderer *r)
 	SDL_Log("    Border sizes: %d %d %d %d", bt, bl, bb, br);
 	/* Skipping the more transient flags about focus and grabs. */
 	SDL_Log("    Flags:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
-		(flags & SDL_WINDOW_FULLSCREEN) ? " FULLSCREEN" : "",
+		((flags & SDL_WINDOW_FULLSCREEN)
+		&& (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+		!= SDL_WINDOW_FULLSCREEN_DESKTOP) ? " FULLSCREEN" : "",
 		(flags & SDL_WINDOW_OPENGL) ? " OPENGL" : "",
 		(flags & SDL_WINDOW_SHOWN) ? " SHOWN" : "",
 		(flags & SDL_WINDOW_HIDDEN) ? " HIDDEN" : "",
@@ -744,8 +746,8 @@ static void log_window_details(int my_index, SDL_Window *w, SDL_Renderer *r)
 		(flags & SDL_WINDOW_RESIZABLE) ? " RESIZABLE" : "",
 		(flags & SDL_WINDOW_MINIMIZED) ? " MINIMIZED" : "",
 		(flags & SDL_WINDOW_MAXIMIZED) ? " MAXIMIZED" : "",
-		(flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
-		? " FULLSCREEN_DESKTOP" : "",
+		((flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+		== SDL_WINDOW_FULLSCREEN_DESKTOP) ? " FULLSCREEN_DESKTOP" : "",
 		(flags & SDL_WINDOW_FOREIGN) ? " FOREIGN" : "",
 		(flags & SDL_WINDOW_ALLOW_HIGHDPI) ? " ALLOW_HIGHDPI" : "",
 		(flags & SDL_WINDOW_ALWAYS_ON_TOP) ? " ALWAYS_ON_TOP" : "",
@@ -1478,14 +1480,17 @@ static SDL_bool handle_shortcut_editor_key(struct sdlpui_dialog *d,
 	keyboard_event_to_angband_key(e, w->app->kp_as_mod, &ch, &mods);
 	if (ch) {
 		char keypress_desc[40];
+		struct keypress tmp[2];
 
 		SDL_assert(pse->changing_shortcut >= 0
 			&& pse->changing_shortcut < MAX_WINDOWS);
 		w->app->menu_shortcuts[pse->changing_shortcut].type = EVT_KBRD;
 		w->app->menu_shortcuts[pse->changing_shortcut].code = ch;
 		w->app->menu_shortcuts[pse->changing_shortcut].mods = mods;
-		keypress_to_text(keypress_desc, sizeof(keypress_desc),
-			&w->app->menu_shortcuts[pse->changing_shortcut], true);
+		tmp[0] = w->app->menu_shortcuts[pse->changing_shortcut];
+		tmp[1] = KEYPRESS_NULL;
+		keypress_to_text(keypress_desc, sizeof(keypress_desc), tmp,
+			true);
 		sdlpui_change_caption(
 			&pse->shortcut_displays[pse->changing_shortcut],
 			d, w, keypress_desc);
@@ -1511,14 +1516,17 @@ static SDL_bool handle_shortcut_editor_textin(struct sdlpui_dialog *d,
 	textinput_event_to_angband_key(e, w->app->kp_as_mod, &ch, &mods);
 	if (ch) {
 		char keypress_desc[40];
+		struct keypress tmp[2];
 
 		SDL_assert(pse->changing_shortcut >= 0
 			&& pse->changing_shortcut < MAX_WINDOWS);
 		w->app->menu_shortcuts[pse->changing_shortcut].type = EVT_KBRD;
 		w->app->menu_shortcuts[pse->changing_shortcut].code = ch;
 		w->app->menu_shortcuts[pse->changing_shortcut].mods = mods;
-		keypress_to_text(keypress_desc, sizeof(keypress_desc),
-			&w->app->menu_shortcuts[pse->changing_shortcut], true);
+		tmp[0] = w->app->menu_shortcuts[pse->changing_shortcut];
+		tmp[1] = KEYPRESS_NULL;
+		keypress_to_text(keypress_desc, sizeof(keypress_desc), tmp,
+			true);
 		sdlpui_change_caption(
 			&pse->shortcut_displays[pse->changing_shortcut],
 			d, w, keypress_desc);
@@ -2075,8 +2083,12 @@ static void show_shortcut_editor(struct sdlpui_window *w, int x, int y)
 		sdlpui_create_label(&pse->labels[i],
 			format("Window %d menu", i + 1),  SDLPUI_HOR_LEFT);
 		if (w->app->menu_shortcuts[i].type == EVT_KBRD) {
+			struct keypress tmp[2];
+
+			tmp[0] = w->app->menu_shortcuts[i];
+			tmp[1] = KEYPRESS_NULL;
 			keypress_to_text(keypress_desc, sizeof(keypress_desc),
-				&w->app->menu_shortcuts[i], true);
+				tmp, true);
 		} else {
 			(void)my_strcpy(keypress_desc, "None",
 				sizeof(keypress_desc));
@@ -2357,7 +2369,9 @@ static void show_sdl_details(struct sdlpui_window *window, int x, int y)
 			SDLPUI_HOR_LEFT);
 		flags = SDL_GetWindowFlags(window->window);
 		label = format("    Flags:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
-			(flags & SDL_WINDOW_FULLSCREEN) ? " FULLSCREEN" : "",
+			((flags & SDL_WINDOW_FULLSCREEN)
+			&& (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+			!= SDL_WINDOW_FULLSCREEN_DESKTOP) ? " FULLSCREEN" : "",
 			(flags & SDL_WINDOW_OPENGL) ? " OPENGL" : "",
 			(flags & SDL_WINDOW_SHOWN) ? " SHOWN" : "",
 			(flags & SDL_WINDOW_HIDDEN) ? " HIDDEN" : "",
@@ -2365,7 +2379,8 @@ static void show_sdl_details(struct sdlpui_window *window, int x, int y)
 			(flags & SDL_WINDOW_RESIZABLE) ? " RESIZABLE" : "",
 			(flags & SDL_WINDOW_MINIMIZED) ? " MINIMIZED" : "",
 			(flags & SDL_WINDOW_MAXIMIZED) ? " MAXIMIZED" : "",
-			(flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+			((flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+			== SDL_WINDOW_FULLSCREEN_DESKTOP)
 			? " FULLSCREEN_DESKTOP" : "",
 			(flags & SDL_WINDOW_FOREIGN) ? " FOREIGN" : "",
 			(flags & SDL_WINDOW_ALLOW_HIGHDPI)
@@ -3662,15 +3677,33 @@ static void handle_window_closed(struct my_app *a, struct sdlpui_window *window)
 	}
 }
 
+#ifdef SDLPUI_TRACE_EVENTS
+static const char *fill_window_name(const struct sdlpui_window *w, char *name,
+		size_t name_sz)
+{
+	if (w) {
+		(void)SDL_snprintf(name, name_sz, "index %d%s", w->index,
+			(w->index == MAIN_WINDOW) ? " (main)" : "");
+	} else {
+		(void)SDL_strlcpy(name, "NULL", name_sz);
+	}
+	return name;
+}
+#endif
+
 static void handle_window_focus(struct my_app *a, const SDL_WindowEvent *event)
 {
 	struct sdlpui_window *new_w;
+#ifdef SDLPUI_TRACE_EVENTS
+	char name[24];
+#endif
 
 	switch (event->event) {
 		case SDL_WINDOWEVENT_ENTER:
 			new_w = get_window_by_id(a, event->windowID);
 			SDLPUI_EVENT_TRACER("window", new_w,
-				"(not extracted)", "mouse entered");
+				fill_window_name(new_w, name, sizeof(name)),
+				"mouse entered");
 			if (a->w_mouse && a->w_mouse->index != new_w->index
 					&& a->w_mouse->d_mouse) {
 				if (a->w_mouse->d_mouse->ftb->handle_window_loses_mouse) {
@@ -3684,7 +3717,8 @@ static void handle_window_focus(struct my_app *a, const SDL_WindowEvent *event)
 			break;
 		case SDL_WINDOWEVENT_LEAVE:
 			SDLPUI_EVENT_TRACER("window", a->w_mouse,
-				"(not extracted)", "mouse left");
+				fill_window_name(a->w_mouse, name,
+				sizeof(name)), "mouse left");
 			if (a->w_mouse && a->w_mouse->d_mouse) {
 				if (a->w_mouse->d_mouse->ftb->handle_window_loses_mouse) {
 					(*a->w_mouse->d_mouse->ftb->handle_window_loses_mouse)(
@@ -3698,7 +3732,8 @@ static void handle_window_focus(struct my_app *a, const SDL_WindowEvent *event)
 		case SDL_WINDOWEVENT_FOCUS_GAINED:
 			new_w = get_window_by_id(a, event->windowID);
 			SDLPUI_EVENT_TRACER("window", new_w,
-				"(not extracted)", "gained key focus");
+				fill_window_name(new_w, name, sizeof(name)),
+				"gained key focus");
 			if (a->w_key && a->w_key->index != new_w->index
 					&& a->w_key->d_key) {
 				if (a->w_key->d_key->ftb->handle_window_loses_key) {
@@ -3711,7 +3746,8 @@ static void handle_window_focus(struct my_app *a, const SDL_WindowEvent *event)
 			break;
 		case SDL_WINDOWEVENT_FOCUS_LOST:
 			SDLPUI_EVENT_TRACER("window", a->w_key,
-				"(not extracted)", "lost key focus");
+				fill_window_name(a->w_key, name, sizeof(name)),
+				"lost key focus");
 			if (a->w_key && a->w_key->d_key) {
 				if (a->w_key->d_key->ftb->handle_window_loses_key) {
 					(*a->w_key->d_key->ftb->handle_window_loses_key)(
@@ -3762,11 +3798,30 @@ static void handle_windowevent(struct my_app *a, const SDL_WindowEvent *event)
 		if (!window) {
 			continue;
 		}
-		if (window->move_state.active) {
-			signal_move_state(window);
-		} else if (window->size_state.active) {
-			signal_size_state(window);
+		/*
+		 * For events that change the window's geometry or display
+		 * or cause it to lose focus, clear resizing or moving of the
+		 * subwindows.
+		 */
+		switch (events[i].window.event) {
+			case SDL_WINDOWEVENT_SHOWN:
+			case SDL_WINDOWEVENT_EXPOSED:
+			case SDL_WINDOWEVENT_ENTER:
+			case SDL_WINDOWEVENT_FOCUS_GAINED:
+			case SDL_WINDOWEVENT_TAKE_FOCUS:
+			case SDL_WINDOWEVENT_HIT_TEST:
+			case SDL_WINDOWEVENT_ICCPROF_CHANGED:
+				break;
+
+			default:
+				if (window->move_state.active) {
+					signal_move_state(window);
+				} else if (window->size_state.active) {
+					signal_size_state(window);
+				}
+				break;
 		}
+
 		switch (events[i].window.event) {
 			case SDL_WINDOWEVENT_RESIZED:
 				/* just for efficiency */
@@ -7555,12 +7610,16 @@ static void dump_config_file(const struct my_app *a)
 		}
 	}
 	for (size_t i = 0; i < N_ELEMENTS(a->menu_shortcuts); i++) {
-		char keypress[1024];
+		char keypress[40];
 
 		if (a->menu_shortcuts[i].type == EVT_KBRD
 				&& a->menu_shortcuts[i].code) {
-			keypress_to_text(keypress, sizeof(keypress),
-				a->menu_shortcuts + i, false);
+			struct keypress tmp[2];
+
+			tmp[0] = a->menu_shortcuts[i];
+			tmp[1] = KEYPRESS_NULL;
+			keypress_to_text(keypress, sizeof(keypress), tmp,
+				false);
 		} else {
 			my_strcpy(keypress, "None", sizeof(keypress));
 		}
