@@ -22,8 +22,10 @@
 #ifdef ALLOW_BORG
 
 #include "../mon-msg.h"
+#include "../game-world.h"
 #include "../ui-term.h"
 
+#include "borg.h"
 #include "borg-cave.h"
 #include "borg-danger.h"
 #include "borg-fight-attack.h"
@@ -36,7 +38,7 @@
 #include "borg-think.h"
 #include "borg-trait.h"
 #include "borg-update.h"
-#include "borg.h"
+#include "borg-util.h"
 
 /*
  * Message memory
@@ -62,21 +64,21 @@ char borg_match[128] = "plain gold ring";
  * See "mon_take_hit()" for details.
  */
 static const char *prefix_kill[]
-    = { "You have killed ", 
-        "You have slain ", 
-        "You have destroyed ", 
+    = { "You have killed ",
+        "You have slain ",
+        "You have destroyed ",
         NULL };
 
 /*
  * Methods of monster death (order not important).
  *
  * See "project_m()", "do_cmd_fire()", "mon_take_hit()" for details.
- * !FIX this should use MON_MSG* 
+ * !FIX this should use MON_MSG*
  */
-static const char *suffix_died[] = { 
+static const char *suffix_died[] = {
     " die.",
     " dies.",
-    " is destroyed.", 
+    " is destroyed.",
     " are destroyed.",
     " is destroyed!",
     " are destroyed!",
@@ -93,12 +95,12 @@ static const char *suffix_died[] = {
     " is drained dry!",
     NULL };
 
-static const char *suffix_blink[] = { 
+static const char *suffix_blink[] = {
     " disappears!", /* from teleport other */
     " intones strange words.", /* from polymorph spell */
     " teleports away.", /* RF6_TPORT */
     " blinks.", /* RF6_BLINK */
-    " makes a soft 'pop'.", 
+    " makes a soft 'pop'.",
     NULL };
 
 /* a message can have up to three parts broken up by variables */
@@ -148,31 +150,149 @@ static bool borg_message_contains(
  */
 static const char *prefix_feeling_danger[] = {
     "You are still uncertain about this place",
-    "Omens of death haunt this place", 
+    "Omens of death haunt this place",
     "This place seems murderous",
-    "This place seems terribly dangerous", 
+    "This place seems terribly dangerous",
     "You feel anxious about this place",
-    "You feel nervous about this place", 
+    "You feel nervous about this place",
     "This place does not seem too risky",
-    "This place seems reasonably safe", 
+    "This place seems reasonably safe",
     "This seems a tame, sheltered place",
-    "This seems a quiet, peaceful place", 
+    "This seems a quiet, peaceful place",
     NULL
 };
 
-static const char *suffix_feeling_stuff[] = { 
+static const char *suffix_feeling_stuff[] = {
     "Looks like any other level.",
-    "you sense an item of wondrous power!", 
+    "you sense an item of wondrous power!",
     "there are superb treasures here.",
     "there are excellent treasures here.",
-    "there are very good treasures here.", 
+    "there are very good treasures here.",
     "there are good treasures here.",
     "there may be something worthwhile here.",
     "there may not be much interesting here.",
-    "there aren't many treasures here.", 
+    "there aren't many treasures here.",
     "there are only scraps of junk here.",
-    "there is naught but cobwebs here.", 
+    "there is naught but cobwebs here.",
     NULL };
+
+
+/*
+ * Read the messages from the top of the screen.
+ */
+bool borg_get_messages(struct keypress* key, struct loc cursor)
+{
+    bool borg_prompt = false;
+
+    char buffer[1024];
+    char* buf = buffer;
+    uint8_t t_a;
+
+    /* get everything on the message line */
+    buf = buffer;
+    borg_what_text(0, 0, ((Term->wid - 1) / (tile_width)), &t_a, buffer);
+#if 0
+    /* just used for debugging.  Not so useful in general */
+    if (borg_cfg[BORG_VERBOSE])
+        borg_note(format("got message '%s'", buf));
+#endif
+    /* Trim whitespace */
+    buf = borg_trim(buf);
+
+    /* Mega-Hack -- check for possible prompts/messages */
+    /* If the first four characters on the message line all */
+    /* have the same attribute (or are all spaces), and they */
+    /* are not all spaces (ascii value 0x20)... */
+    if ((t_a != COLOUR_DARK)
+        && (buf[0] != ' ' || buf[1] != ' ' || buf[2] != ' ' || buf[3] != ' ')) {
+        /* Assume a prompt/message is available */
+        borg_prompt = true;
+    }
+
+    /* check for strings starting "Type" because those are also prompts */
+    if (borg_prompt && prefix(buf, "Type")) {
+        borg_prompt = false;
+    }
+
+    /* handle the messages the borg has to react to immediately */
+    if (borg_prompt && !inkey_flag && strlen(buf)) {
+        if (borg_react_prompted(buf, key, cursor))
+            return true;
+    }
+
+    /* Mega-Hack -- Catch "-more-" messages */
+    /* If there is text on the first line... */
+    /* And the game does not want a command... */
+    /* And the cursor is on the top line... */
+    /* And there is text before the cursor... */
+    /* And that text is "-more-" */
+    buf = buffer;
+    if (borg_prompt && !inkey_flag && (cursor.y == 0) && (cursor.x >= 7)
+        && (0 == borg_what_text(cursor.x - 7, cursor.y, 7, &t_a, buffer))
+        && (suffix(buf, " -more-"))) {
+
+        if (borg_cfg[BORG_VERBOSE])
+            borg_note("# message with -more-");
+
+        /* Get the message */
+        if (0 == borg_what_text(0, 0, cursor.x - 7, &t_a, buffer)) {
+            /* Parse it */
+            borg_parse(buf);
+        }
+        /* Clear the message */
+        if (borg_cfg[BORG_VERBOSE])
+            borg_note("clearing -more-");
+        key->code = ' ';
+        return true;
+    }
+
+#if 0
+    /* HACK */
+    /* in the odd case where a we get here before the message */
+    /* about cheating death comes up.  */
+    if (!character_dungeon) {
+        if (borg_cfg[BORG_VERBOSE])
+            borg_note("# Mid reincarnation, no map yet");
+
+        /* do nothing */
+        key->code = KC_ENTER;
+
+        return true;
+    }
+#endif
+
+    /* Catch normal messages */
+    /* If there is text on the first line... */
+    /* And the game wants a command */
+    if (borg_prompt && inkey_flag) {
+        if (borg_cfg[BORG_VERBOSE])
+            borg_note("# parse normal message");
+        /* Get the message(s) */
+        buf = buffer;
+        if (0
+            == borg_what_text(
+                0, 0, ((Term->wid - 1) / (tile_width)), &t_a, buffer)) {
+            int k = strlen(buf);
+
+            /* Strip trailing spaces */
+            while ((k > 0) && (buf[k - 1] == ' '))
+                k--;
+
+            /* Terminate */
+            buf[k] = '\0';
+
+            /* Parse it */
+            borg_parse(buf);
+        }
+
+        /* Clear the message */
+        key->code = ' ';
+        return true;
+    }
+
+    return false;
+}
+
 
 /*
  * Parse a message from the world
@@ -231,12 +351,16 @@ static void borg_parse_aux(char *msg, int len)
     /* Notice death */
     if (prefix(msg, "You die.")) {
         /* Abort (unless cheating) */
-        if (!(player->wizard || OPT(player, cheat_live) || borg_cheat_death)) {
+        if (!(player->wizard
+            || OPT(player, cheat_live)
+            || borg.status.cheat_death)) {
             /* Abort */
             borg_oops("death");
 
-            /* Abort right now! */
-            borg_active = false;
+            /* Abort right now if not reincarnating */
+            if (!borg.status.respawning) {
+                borg.status.active = false;
+            }
             /* Noise XXX XXX XXX */
             Term_xtra(TERM_XTRA_NOISE, 1);
         }
@@ -276,7 +400,7 @@ static void borg_parse_aux(char *msg, int len)
     /* Mega-Hack -- Check against the search string */
     if (borg_match[0] && strstr(msg, borg_match)) {
         /* Clean cancel */
-        borg_cancel = true;
+        borg.status.cancel = true;
     }
 
     /* Ignore teleport trap */
@@ -635,8 +759,8 @@ static void borg_parse_aux(char *msg, int len)
 
     /* Feature XXX XXX XXX */
     if (streq(msg, "You tunnel into the granite wall.")) {
-        /* reseting my panel clock */
-        borg.time_this_panel = 1;
+        /* reseting my anti-bounce count */
+        borg.antibounce_count = 1;
 
         /* Only process walls */
         if ((ag->feat >= FEAT_GRANITE) && (ag->feat <= FEAT_PERM)) {
@@ -762,7 +886,7 @@ static void borg_parse_aux(char *msg, int len)
     }
 
     /* Wearing Cursed Item */
-    if (prefix(msg, "Oops! It feels deathly cold!")) {
+    if (prefix(msg, "Oops!  It feels deathly cold!")) {
         /* this should only happen with STICKY items, The Crown of Morgoth or
          * The One Ring */
         /* !FIX !TODO handle crown eventually */
@@ -839,8 +963,8 @@ static void borg_parse_aux(char *msg, int len)
 
     /* check for wall blocking but not when confused*/
     if ((prefix(msg, "There is a wall ") && (!borg.trait[BI_ISCONFUSED]))) {
-        my_need_redraw = true;
-        my_need_alter  = true;
+        borg.status.redraw = true;
+        borg.status.need_alter  = true;
         borg.goal.type = 0;
         return;
     }
@@ -848,8 +972,8 @@ static void borg_parse_aux(char *msg, int len)
     /* check for closed door but not when confused*/
     if ((prefix(msg, "There is a closed door blocking your way.")
             && (!borg.trait[BI_ISCONFUSED] && !borg.trait[BI_ISIMAGE]))) {
-        my_need_redraw = true;
-        my_need_alter  = true;
+        borg.status.redraw = true;
+        borg.status.need_alter  = true;
         borg.goal.type = 0;
         return;
     }
@@ -883,13 +1007,13 @@ static void borg_parse_aux(char *msg, int len)
             }
         }
 
-        my_no_alter    = true;
+        borg.status.no_alter    = true;
         borg.goal.type = 0;
         return;
     }
 
     /* Check for the missing staircase */
-    if (prefix(msg, "No known path to ") || 
+    if (prefix(msg, "No known path to ") ||
         prefix(msg, "Something is here.")) {
         /* make sure the aligned dungeon is on */
 
@@ -906,7 +1030,7 @@ static void borg_parse_aux(char *msg, int len)
     if (prefix(msg, "You see nothing there ")) {
         ag->feat    = FEAT_BROKEN;
 
-        my_no_alter = true;
+        borg.status.no_alter = true;
         /* Clear goals */
         borg.goal.type = 0;
         return;
@@ -915,10 +1039,9 @@ static void borg_parse_aux(char *msg, int len)
     /* Hack to protect against clock overflows and errors */
     if (prefix(msg, "Illegal ")) {
         /* Oops */
-        borg_respawning = 7;
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
-        borg.time_this_panel += 100;
+        borg.antibounce_count += 100;
         return;
     }
 
@@ -927,7 +1050,7 @@ static void borg_parse_aux(char *msg, int len)
         /* Oops */
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
-        borg.time_this_panel += 100;
+        borg.antibounce_count += 100;
 
         /* ID all items (equipment) */
         for (i = INVEN_WIELD; i <= INVEN_FEET; i++) {
@@ -963,7 +1086,7 @@ static void borg_parse_aux(char *msg, int len)
         /* Oops */
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
-        borg.time_this_panel += 100;
+        borg.antibounce_count += 100;
     }
 
     /* resist acid */
@@ -1109,8 +1232,8 @@ static void borg_parse_aux(char *msg, int len)
     }
 
     if (prefix(msg, "The enchantment failed")) {
-        /* reset our panel clock for this */
-        borg.time_this_panel = 1;
+        /* reset our anti-bounce count for this */
+        borg.antibounce_count = 1;
         return;
     }
 
@@ -1152,7 +1275,7 @@ static void borg_parse_aux(char *msg, int len)
     if (prefix(msg, "You hear a door burst open!")) {
         /* on level 1 and 2 be concerned.  Could be Grip or Fang */
         if (borg.trait[BI_CDEPTH] <= 3 && borg.trait[BI_CLEVEL] <= 5)
-            scaryguy_on_level = true;
+            borg.mon.scary = true;
     }
 
     /* Some spells move the borg from his grid */
@@ -1332,9 +1455,13 @@ static void clean_msgs(struct borg_read_messages *msgs)
         string_free(msgs->messages[i].message_p2);
         string_free(msgs->messages[i].message_p3);
     }
-    mem_free(msgs->messages);
+    if (msgs->messages) {
+        mem_free(msgs->messages);
+    }
     msgs->messages = NULL;
-    mem_free(msgs->index);
+    if (msgs->index) {
+        mem_free(msgs->index);
+    }
     msgs->index     = NULL;
     msgs->count     = 0;
     msgs->allocated = 0;
@@ -1576,11 +1703,11 @@ static void borg_init_pain_messages(void)
         switch (idx) {
         case MON_MSG_DISAPPEAR:
         case MON_MSG_95:
-        case MON_MSG_75: 
-        case MON_MSG_50: 
-        case MON_MSG_35: 
-        case MON_MSG_20: 
-        case MON_MSG_10: 
+        case MON_MSG_75:
+        case MON_MSG_50:
+        case MON_MSG_35:
+        case MON_MSG_20:
+        case MON_MSG_10:
         case MON_MSG_0:  continue;
         }
         if (std_pain != NULL)
@@ -1615,6 +1742,8 @@ static void borg_init_hit_by_messages(void)
 /* init all messages used by the borg */
 void borg_init_messages(void)
 {
+    borg_free_messages();
+
     borg_init_spell_messages();
     borg_init_pain_messages();
     borg_init_hit_by_messages();
@@ -1648,13 +1777,23 @@ void borg_free_messages(void)
 {
     int i;
 
-    mem_free(borg_msg_use);
-    borg_msg_use = NULL;
-    mem_free(borg_msg_pos);
-    borg_msg_pos = NULL;
+    if (borg_msg_buf) {
+        mem_free(borg_msg_buf);
+        borg_msg_buf = NULL;
+    }
+    if (borg_msg_use) {
+        mem_free(borg_msg_use);
+        borg_msg_use = NULL;
+    }
+    if (borg_msg_pos) {
+        mem_free(borg_msg_pos);
+        borg_msg_pos = NULL;
+    }
     borg_msg_num = 0;
-    mem_free(borg_msg_buf);
-    borg_msg_buf = NULL;
+    if (borg_msg_buf) {
+        mem_free(borg_msg_buf);
+        borg_msg_buf = NULL;
+    }
     borg_msg_siz = 0;
 
     if (suffix_pain) {

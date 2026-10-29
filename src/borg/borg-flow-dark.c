@@ -31,7 +31,7 @@
 #include "borg-flow-misc.h"
 #include "borg-flow-stairs.h"
 #include "borg-flow.h"
-#include "borg-projection.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -92,7 +92,7 @@ static bool borg_flow_dark_interesting(int y, int x)
             return false;
 
         /* hack and cheat.  No vaults  on this level */
-        if (!vault_on_level)
+        if (!borg.status.vault)
             return false;
 
         /* make sure we can dig */
@@ -130,7 +130,7 @@ static bool borg_flow_dark_interesting(int y, int x)
     /* Explore "closed doors" */
     if (ag->feat == FEAT_CLOSED) {
         /* some closed doors leave alone */
-        if (breeder_level) {
+        if (borg.near.breeder) {
             /* Did I close this one */
             for (i = 0; i < track_door.num; i++) {
                 /* mark as icky if I closed this one */
@@ -181,7 +181,7 @@ static bool borg_flow_dark_interesting(int y, int x)
             return false;
 
         /* Do not explore if a Scaryguy on the Level */
-        if (scaryguy_on_level)
+        if (borg.mon.scary)
             return false;
 
         /* NOTE: the flow code allows a borg to flow through a trap and so he
@@ -268,25 +268,25 @@ static void borg_flow_direct(int y, int x)
 
         /* Increase bravery */
         if (borg.trait[BI_MAXCLEVEL] == 50)
-            fear = avoidance * 5 / 10;
+            fear = borg.avoidance * 5 / 10;
         if (borg.trait[BI_MAXCLEVEL] != 50)
-            fear = avoidance * 3 / 10;
-        if (scaryguy_on_level)
-            fear = avoidance * 2;
-        if (unique_on_level && vault_on_level && borg.trait[BI_MAXCLEVEL] == 50)
-            fear = avoidance * 3;
-        if (scaryguy_on_level && borg.trait[BI_CLEVEL] <= 5)
-            fear = avoidance * 3;
+            fear = borg.avoidance * 3 / 10;
+        if (borg.mon.scary)
+            fear = borg.avoidance * 2;
+        if (borg.mon.unique && borg.status.vault && borg.trait[BI_MAXCLEVEL] == 50)
+            fear = borg.avoidance * 3;
+        if (borg.mon.scary && borg.trait[BI_CLEVEL] <= 5)
+            fear = borg.avoidance * 3;
         if (borg.goal.ignoring)
-            fear = avoidance * 5;
-        if (borg_t - borg_began > 5000)
-            fear = avoidance * 25;
+            fear = borg.avoidance * 5;
+        if (borg_timer(borg.time.level) > 5000)
+            fear = borg.avoidance * 25;
         if (borg.trait[BI_FOOD] == 0)
-            fear = avoidance * 100;
+            fear = borg.avoidance * 100;
 
         /* Normal in town */
         if (borg.trait[BI_CLEVEL] == 0)
-            fear = avoidance * 1 / 10;
+            fear = borg.avoidance * 1 / 10;
 
         /* Mark dangerous grids as icky */
         if (p > fear) {
@@ -359,8 +359,8 @@ static void borg_flow_direct(int y, int x)
             return;
 
         /* Avoid Traps if low level-- unless brave or scaryguy. */
-        if (ag->trap && avoidance <= borg.trait[BI_CURHP]
-            && !scaryguy_on_level) {
+        if (ag->trap && borg.avoidance <= borg.trait[BI_CURHP]
+            && !borg.mon.scary) {
             /* Do not disarm when you could end up dead */
             if (borg.trait[BI_CURHP] < 60)
                 return;
@@ -390,26 +390,26 @@ static void borg_flow_direct(int y, int x)
 
             /* Increase bravery */
             if (borg.trait[BI_MAXCLEVEL] == 50)
-                fear = avoidance * 5 / 10;
+                fear = borg.avoidance * 5 / 10;
             if (borg.trait[BI_MAXCLEVEL] != 50)
-                fear = avoidance * 3 / 10;
-            if (scaryguy_on_level)
-                fear = avoidance * 2;
-            if (unique_on_level && vault_on_level
+                fear = borg.avoidance * 3 / 10;
+            if (borg.mon.scary)
+                fear = borg.avoidance * 2;
+            if (borg.mon.unique && borg.status.vault
                 && borg.trait[BI_MAXCLEVEL] == 50)
-                fear = avoidance * 3;
-            if (scaryguy_on_level && borg.trait[BI_CLEVEL] <= 5)
-                fear = avoidance * 3;
+                fear = borg.avoidance * 3;
+            if (borg.mon.scary && borg.trait[BI_CLEVEL] <= 5)
+                fear = borg.avoidance * 3;
             if (borg.goal.ignoring)
-                fear = avoidance * 5;
-            if (borg_t - borg_began > 5000)
-                fear = avoidance * 25;
+                fear = borg.avoidance * 5;
+            if (borg_timer(borg.time.level) > 5000)
+                fear = borg.avoidance * 25;
             if (borg.trait[BI_FOOD] == 0)
-                fear = avoidance * 100;
+                fear = borg.avoidance * 100;
 
             /* Normal in town */
             if (borg.trait[BI_CLEVEL] == 0)
-                fear = avoidance * 1 / 10;
+                fear = borg.avoidance * 1 / 10;
 
             /* Avoid dangerous grids (forever) */
             if (p > fear) {
@@ -501,7 +501,7 @@ static bool borg_flow_dark_1(int b_stair)
         return false;
 
     /* Wipe icky codes from grids if needed */
-    if (borg.goal.ignoring || scaryguy_on_level)
+    if (borg.goal.ignoring || borg.mon.scary)
         borg_danger_wipe = true;
 
     /* Clear the flow codes */
@@ -517,7 +517,7 @@ static bool borg_flow_dark_1(int b_stair)
     }
 
     /* Attempt to Commit the flow */
-    if (!borg_flow_commit(NULL, GOAL_DARK))
+    if (!borg_flow_commit("dark-1", GOAL_DARK))
         return false;
 
     /* Take one step */
@@ -598,7 +598,7 @@ static bool borg_flow_dark_2(int b_stair)
         return false;
 
     /* Wipe icky codes from grids if needed */
-    if (borg.goal.ignoring || scaryguy_on_level)
+    if (borg.goal.ignoring || borg.mon.scary)
         borg_danger_wipe = true;
 
     /* Clear the flow codes */
@@ -614,7 +614,7 @@ static bool borg_flow_dark_2(int b_stair)
     }
 
     /* Attempt to Commit the flow */
-    if (!borg_flow_commit(NULL, GOAL_DARK))
+    if (!borg_flow_commit("dark-2", GOAL_DARK))
         return false;
 
     /* Take one step */
@@ -695,7 +695,7 @@ static bool borg_flow_dark_3(int b_stair)
         return false;
 
     /* Wipe icky codes from grids if needed */
-    if (borg.goal.ignoring || scaryguy_on_level)
+    if (borg.goal.ignoring || borg.mon.scary)
         borg_danger_wipe = true;
 
     /* Clear the flow codes */
@@ -714,7 +714,7 @@ static bool borg_flow_dark_3(int b_stair)
     borg_flow_spread(5, false, true, false, -1, false);
 
     /* Attempt to Commit the flow */
-    if (!borg_flow_commit(NULL, GOAL_DARK))
+    if (!borg_flow_commit("dark-3", GOAL_DARK))
         return false;
 
     /* Take one step */
@@ -750,7 +750,7 @@ static bool borg_flow_dark_4(int b_stair)
         return false;
 
     /* Not if a vault is on the level */
-    if (vault_on_level)
+    if (borg.status.vault)
         return false;
 
     /* Local region */
@@ -800,7 +800,7 @@ static bool borg_flow_dark_4(int b_stair)
         return false;
 
     /* Wipe icky codes from grids if needed */
-    if (borg.goal.ignoring || scaryguy_on_level)
+    if (borg.goal.ignoring || borg.mon.scary)
         borg_danger_wipe = true;
 
     /* Clear the flow codes */
@@ -898,7 +898,7 @@ static bool borg_flow_dark_5(int b_stair)
         return false;
 
     /* Wipe icky codes from grids if needed */
-    if (borg.goal.ignoring || scaryguy_on_level)
+    if (borg.goal.ignoring || borg.mon.scary)
         borg_danger_wipe = true;
 
     /* Clear the flow codes */
@@ -914,11 +914,11 @@ static bool borg_flow_dark_5(int b_stair)
     }
 
     /* Spread the flow */
-    if (borg.trait[BI_CLEVEL] <= 5 && avoidance <= borg.trait[BI_CURHP]) {
+    if (borg.trait[BI_CLEVEL] <= 5 && borg.avoidance <= borg.trait[BI_CURHP]) {
         /* Short Leash */
         borg_flow_spread(leash, true, true, false, -1, false);
     } else if (borg.trait[BI_CLEVEL] <= 30
-               && avoidance <= borg.trait[BI_CURHP]) {
+               && borg.avoidance <= borg.trait[BI_CURHP]) {
         /* Short Leash */
         borg_flow_spread(leash, true, true, false, -1, false);
     } else {
@@ -951,7 +951,7 @@ bool borg_flow_dark(bool neer)
     int b_stair = -1;
 
     /* Not if sitting in a sea of runes and we saw Morgoth recently */
-    if (borg_morgoth_position && morgoth_on_level)
+    if (borg.morgoth_position && borg.near.morgoth)
         return false;
 
     /* Paranoia */

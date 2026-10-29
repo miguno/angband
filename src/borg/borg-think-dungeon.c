@@ -53,7 +53,6 @@
 #include "borg-projection.h"
 #include "borg-recover.h"
 #include "borg-store-sell.h"
-#include "borg-store.h"
 #include "borg-think-dungeon-util.h"
 #include "borg-think-store.h"
 #include "borg-think.h"
@@ -965,7 +964,7 @@ static bool borg_think_dungeon_brave(void)
             return true;
 
         /* Try to find some stairs */
-        if (scaryguy_on_level && !borg.trait[BI_CDEPTH]
+        if (borg.mon.scary && !borg.trait[BI_CDEPTH]
             && borg_flow_stair_both(GOAL_FLEE, false))
             return true;
 
@@ -977,7 +976,7 @@ static bool borg_think_dungeon_brave(void)
     }
 
     /* Flee the level */
-    if (borg.goal.fleeing || borg.goal.leaving || scaryguy_on_level) {
+    if (borg.goal.fleeing || borg.goal.leaving || borg.mon.scary) {
         /* Take the next stairs */
         borg.stair_less = borg.goal.fleeing;
 
@@ -1014,7 +1013,7 @@ static bool borg_think_dungeon_brave(void)
     }
 
     /* Do short looks on special levels */
-    if (vault_on_level) {
+    if (borg.status.vault) {
         /* Continue flowing towards monsters */
         if (borg_flow_old(GOAL_KILL))
             return true;
@@ -1089,7 +1088,8 @@ static bool borg_think_dungeon_brave(void)
         return true;
 
     /* Search for secret door via spell before spastic */
-    if (!borg.when_detect_doors || (borg_t - borg.when_detect_doors >= 500)) {
+    if (!borg.time.detect_doors
+        || (borg_timer(borg.time.detect_doors) >= 500)) {
         if (borg_check_light())
             return true;
     }
@@ -1107,7 +1107,7 @@ static bool borg_think_dungeon_brave(void)
         return true;
 
     /* Search for secret door via spell before spastic */
-    if (!borg.when_detect_doors || (borg_t - borg.when_detect_doors >= 500)) {
+    if (!borg.time.detect_doors || (borg_timer(borg.time.detect_doors) >= 500)) {
         if (borg_check_light())
             return true;
     }
@@ -1123,6 +1123,107 @@ static bool borg_think_dungeon_brave(void)
     /* Nothing */
     return false;
 }
+
+/*
+ * Prevent a "bouncing Borg" bug. Where borg with telepathy
+ * will sit in a narrow area bouncing between 2 or 3 places
+ * tracking and flowing to a bouncing monster behind a wall.
+ * First, reset goals.
+ * Second, clear all known monsters/takes
+ * Third, Flee the level
+ */
+static bool borg_check_bounciness(void)
+{
+    int i;
+
+    if (borg.trait[BI_CDEPTH]
+        && (borg.antibounce_count >= 300 && borg.antibounce_count <= 303)) {
+        /* Clear Goals */
+        borg.goal.type = 0;
+    }
+    if (borg.trait[BI_CDEPTH]
+        && (borg.antibounce_count >= 500 && borg.antibounce_count <= 503)) {
+        /* Forget old objects */
+        for (i = 1; i < borg_takes_nxt; i++)
+            borg_delete_take(i);
+
+        /* No objects here */
+        borg_takes_cnt = 0;
+        borg_takes_nxt = 1;
+
+        /* Forget old monsters */
+        for (i = 1; i < borg_kills_nxt; i++)
+            borg_delete_kill(i);
+
+        /* No monsters here */
+        borg_kills_cnt = 0;
+        borg_kills_nxt = 1;
+    }
+
+    if (borg.trait[BI_CDEPTH] && (borg.antibounce_count >= 700)) {
+        /* Start leaving */
+        if (!borg.goal.leaving) {
+            /* Note */
+            borg_note("# Leaving (bouncing-borg)");
+
+            /* Start leaving */
+            borg.goal.leaving = true;
+        }
+
+        /* Start fleeing */
+        if (!borg.goal.fleeing) {
+            /* Note */
+            borg_note("# Fleeing (bouncing-borg)");
+
+            /* Start fleeing */
+            borg.goal.fleeing = true;
+        }
+    }
+    return false;
+}
+
+static bool borg_check_breeders(void)
+{
+    /* Close doors on breeder levels */
+    if (borg.mon.breeders >= 3) {
+        /* set the flag to close doors */
+        borg.near.breeder = true;
+    }
+
+    /* Caution from breeders */
+    if ((borg.mon.breeders >= MIN(borg.trait[BI_CLEVEL] + 2, 5))
+        && (borg.trait[BI_RECALL] <= 0 || borg.trait[BI_CLEVEL] < 35)) {
+        /* Ignore monsters from caution */
+        if (!borg.goal.ignoring && borg_timer(borg.time.level) >= 2500) {
+            /* Flee */
+            borg_note("# Ignoring breeders (no recall)");
+
+            /* Ignore multipliers */
+            borg.goal.ignoring = true;
+        }
+
+        /* Start leaving */
+        if (!borg.goal.leaving) {
+            /* Note */
+            borg_note("# Leaving (no recall)");
+
+            /* Start leaving */
+            borg.goal.leaving = true;
+        }
+
+        /* Start fleeing */
+        if (!borg.goal.fleeing) {
+            /* Note */
+            borg_note("# Fleeing (no recall)");
+
+            /* Start fleeing */
+            borg.goal.fleeing = true;
+        }
+    }
+
+    return false;
+}
+
 
 /*
  * Perform an action in the dungeon
@@ -1156,45 +1257,33 @@ bool borg_think_dungeon(void)
 {
     int i, j;
     int b_j = -1;
-
-    /* Delay Factor */
-    int msec = ((player->opts.delay_factor * player->opts.delay_factor)
-                + (borg_cfg[BORG_DELAY_FACTOR] * borg_cfg[BORG_DELAY_FACTOR]));
-
-    /* HACK allows user to stop the borg on certain levels */
-    if (borg.trait[BI_CDEPTH] == borg_cfg[BORG_STOP_DLEVEL])
-        borg_oops("Auto-stop for user DLevel.");
-
-    if (borg.trait[BI_CLEVEL] == borg_cfg[BORG_STOP_CLEVEL])
-        borg_oops("Auto-stop for user CLevel.");
-
-    /* HACK to end all hacks,,, allow the borg to stop if money scumming */
-    if (borg.trait[BI_GOLD] > borg_cfg[BORG_MONEY_SCUM_AMOUNT]
-        && borg_cfg[BORG_MONEY_SCUM_AMOUNT] != 0 && !borg.trait[BI_CDEPTH]
-        && !borg_cfg[BORG_SELF_SCUM]) {
-        borg_oops("Money Scum complete.");
-    }
+    int msec;
 
     /* HACK: Prevent clock wrapping Step 1 */
-    if ((borg_t >= 12000 && borg_t <= 12025)
-        || (borg_t >= 25000 && borg_t <= 25025)) {
+    if ((borg.time.now >= 12000 && borg.time.now <= 12025)
+        || (borg.time.now >= 25000 && borg.time.now <= 25025)) {
         /* Clear Possible errors */
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
 
-        /* Re-examine inven and equip */
-        borg_do_inven = true;
-        borg_do_equip = true;
-
         /* enter a special routine to handle this behavior.  Messing with
          * the old_level forces him to re-explore this level, and reshop,
          * if in town.
          */
-        old_depth = 126;
+        borg.status.old_depth = 126;
 
         /* Continue on */
+        return true;
+    }
+
+    /* Prevent clock wrapping Step 2 */
+    if (borg.time.now >= BORG_TIME_MAX - 3000) {
+        /* Panic */
+        borg_oops("clock overflow");
+
+        /* Oops */
         return true;
     }
 
@@ -1202,49 +1291,24 @@ bool borg_think_dungeon(void)
     borg.trying_unknown = false;
 
     /* if standing on something valueless, destroy it */
+    /* this can be done first because it takes no "turns" */
     if (borg_destroy_floor())
         return true;
- 
-    /* Prevent clock wrapping Step 2 */
-    if (borg_t >= 30000) {
-        /* Panic */
-        borg_oops("clock overflow");
-
-#ifdef BABLOS
-        /* Clock overflow escape code */
-        printf("Clock overflow code!\n");
-        player->playing = false;
-        player->leaving = true;
-        borg_clock_over = true;
-#endif /* BABLOS */
-
-        /* Oops */
-        return true;
-    }
-
-    /* Allow respawning borgs to update their variables */
-    if (borg_respawning > 1) {
-        borg_note(
-            format("# Pressing 'escape' to catch up and get in sync (%d).",
-                borg_respawning));
-        borg_keypress(ESCAPE);
-        borg_keypress(ESCAPE);
-        borg_respawning--;
-        return true;
-    }
 
     /* add a short pause to slow the borg down for viewing */
+    msec = ((player->opts.delay_factor * player->opts.delay_factor)
+        + (borg_cfg[BORG_DELAY_FACTOR] * borg_cfg[BORG_DELAY_FACTOR]));
     Term_xtra(TERM_XTRA_DELAY, msec);
 
     /* redraw the screen if we need to */
-    if (my_need_redraw) {
+    if (borg.status.redraw) {
         borg_note(format("#  Redrawing screen."));
         do_cmd_redraw();
-        my_need_redraw = false;
+        borg.status.redraw = false;
     }
 
     /* Prevent clock overflow */
-    if (borg_t - borg_began >= 10000) {
+    if (borg_timer(borg.time.level) >= 10000) {
         /* Start leaving */
         if (!borg.goal.leaving) {
             /* Note */
@@ -1270,8 +1334,8 @@ bool borg_think_dungeon(void)
 
     /* Allow borg to jump back up to town if needed.  He probably fled town
      * because he saw a scaryguy (BSV, SER, Maggot).  Since he is here on depth
-     * 1, do a quick check for items near the stairs that I can pick up before I
-     * return to town.
+     * 1, do a quick check for items near the stairs that I can pick up before
+     * returning to town.
      */
     if (borg.trait[BI_CDEPTH] == 1 && borg.goal.fleeing_to_town) {
 
@@ -1298,115 +1362,20 @@ bool borg_think_dungeon(void)
         }
     }
 
-    /* Prevent a "bouncing Borg" bug. Where borg with telepathy
-     * will sit in a narrow area bouncing between 2 or 3 places
-     * tracking and flowing to a bouncing monster behind a wall.
-     * First, reset goals.
-     * Second, clear all known monsters/takes
-     * Third, Flee the level
-     */
-    if (borg.trait[BI_CDEPTH]
-        && (borg.time_this_panel >= 300 && borg.time_this_panel <= 303)) {
-        /* Clear Goals */
-        borg.goal.type = 0;
-    }
-    if (borg.trait[BI_CDEPTH]
-        && (borg.time_this_panel >= 500 && borg.time_this_panel <= 503)) {
-        /* Forget old objects */
-        for (i = 1; i < borg_takes_nxt; i++)
-            borg_delete_take(i);
+    /* check if we need to do something due to bouncing between spots
+     * this will set flags to change behavior even if it doesn't force
+     * an action */
+    if (borg_check_bounciness())
+        return true;
 
-        /* No objects here */
-        borg_takes_cnt = 0;
-        borg_takes_nxt = 1;
-
-        /* Forget old monsters */
-        for (i = 1; i < borg_kills_nxt; i++)
-            borg_delete_kill(i);
-
-        /* No monsters here */
-        borg_kills_cnt = 0;
-        borg_kills_nxt = 1;
-    }
-
-    if (borg.trait[BI_CDEPTH] && (borg.time_this_panel >= 700)) {
-        /* Start leaving */
-        if (!borg.goal.leaving) {
-            /* Note */
-            borg_note("# Leaving (bouncing-borg)");
-
-            /* Start leaving */
-            borg.goal.leaving = true;
-        }
-
-        /* Start fleeing */
-        if (!borg.goal.fleeing) {
-            /* Note */
-            borg_note("# Fleeing (bouncing-borg)");
-
-            /* Start fleeing */
-            borg.goal.fleeing = true;
-        }
-    }
-
-    /* Count the awake breeders */
-    for (j = 0, i = 1; i < borg_kills_nxt; i++) {
-        borg_kill *kill = &borg_kills[i];
-
-        /* Skip dead monsters */
-        if (!kill->r_idx)
-            continue;
-
-        /* Skip sleeping monsters */
-        if (!kill->awake)
-            continue;
-
-        /* Count the monsters which are "breeders" */
-        if (rf_has(r_info[kill->r_idx].flags, RF_MULTIPLY))
-            j++;
-    }
-
-    /* hack -- close doors on breeder levels */
-    if (j >= 3) {
-        /* set the flag to close doors */
-        breeder_level = true;
-    }
-
-    /* Caution from breeders */
-    if ((j >= MIN(borg.trait[BI_CLEVEL] + 2, 5))
-        && (borg.trait[BI_RECALL] <= 0 || borg.trait[BI_CLEVEL] < 35)) {
-        /* Ignore monsters from caution */
-        if (!borg.goal.ignoring && borg_t >= 2500) {
-            /* Flee */
-            borg_note("# Ignoring breeders (no recall)");
-
-            /* Ignore multipliers */
-            borg.goal.ignoring = true;
-        }
-
-        /* Start leaving */
-        if (!borg.goal.leaving) {
-            /* Note */
-            borg_note("# Leaving (no recall)");
-
-            /* Start leaving */
-            borg.goal.leaving = true;
-        }
-
-        /* Start fleeing */
-        if (!borg.goal.fleeing) {
-            /* Note */
-            borg_note("# Fleeing (no recall)");
-
-            /* Start fleeing */
-            borg.goal.fleeing = true;
-        }
-    }
+    /* check if we need to do something due to breeders */
+    if (borg_check_breeders())
+        return true;
 
     /* Reset avoidance */
-    if (avoidance != borg.trait[BI_CURHP]) {
+    if (borg.avoidance != borg.trait[BI_CURHP]) {
         /* Reset "avoidance" */
-        avoidance = borg.trait[BI_CURHP];
+        borg.avoidance = borg.trait[BI_CURHP];
 
         /* Re-calculate danger */
         borg_danger_wipe = true;
@@ -1445,7 +1414,7 @@ bool borg_think_dungeon(void)
                     format("# Return to Stair (wandered too far.  Leash: %d)",
                         borg.trait[BI_CLEVEL] * 3 + 14));
 
-                /* Start returning */
+            /* Start returning */
                 borg.goal.less = true;
             }
 
@@ -1462,16 +1431,21 @@ bool borg_think_dungeon(void)
         }
     }
 
+    /* examine equipment and swaps */
+    borg_notice(true);
+
     /* Quick check to see if borg needs to engage his lunal mode */
     if (borg_cfg[BORG_SELF_LUNAL]
         && !borg_cfg[BORG_PLAYS_RISKY]) /* Risky borg in a hurry */
     {
+        /* Prepared for much deeper */
+        /* in the right depth range of depths */
+        /* below level one (not in a shopping loop) */
+        /* and not too shallow */
         if ((char *)NULL == borg_prepared(borg.trait[BI_CDEPTH] + 15)
-            && /* Prepared */
-            borg.trait[BI_MAXDEPTH] >= borg.trait[BI_CDEPTH] + 15
-            && /* Right zone */
-            borg.trait[BI_CDEPTH] >= 1 && /* In dungeon fully */
-            borg.trait[BI_CDEPTH] > borg.trait[BI_CLEVEL] / 3) /* Not shallow */
+            && borg.trait[BI_MAXDEPTH] >= borg.trait[BI_CDEPTH] + 15
+            && borg.trait[BI_CDEPTH] >= 1
+            && borg.trait[BI_CDEPTH] > borg.trait[BI_CLEVEL] / 3)
         {
             borg.lunal_mode = true;
 
@@ -1514,9 +1488,6 @@ bool borg_think_dungeon(void)
     }
 
     /*** crucial goals ***/
-
-    /* examine equipment and swaps */
-    borg_notice(true);
 
     /* require light-- Special handle for being out of a light source.*/
     if (borg_think_dungeon_light())
@@ -1740,7 +1711,7 @@ bool borg_think_dungeon(void)
             return true;
 
         /* Try to find some stairs */
-        if (scaryguy_on_level && borg_flow_stair_both(GOAL_FLEE, false))
+        if (borg.mon.scary && borg_flow_stair_both(GOAL_FLEE, false))
             return true;
 
         /* Try to find some stairs up */
@@ -1764,7 +1735,7 @@ bool borg_think_dungeon(void)
             return true;
 
         /* Try to find some stairs */
-        if (scaryguy_on_level && borg_flow_stair_both(GOAL_FLEE, false))
+        if (borg.mon.scary && borg_flow_stair_both(GOAL_FLEE, false))
             return true;
 
         /* Try to find some stairs up */
@@ -1779,7 +1750,7 @@ bool borg_think_dungeon(void)
     }
 
     /* Flee to a safe Morgoth grid if appropriate */
-    if (!borg.trait[BI_KING] && morgoth_on_level && !borg_morgoth_position
+    if (!borg.trait[BI_KING] && borg.near.morgoth && !borg.morgoth_position
         && (borg.trait[BI_AGLYPH] >= 10
             && (!borg.trait[BI_ISBLIND] && !borg.trait[BI_ISCONFUSED]))) {
         /* Continue flowing towards good morgoth grid */
@@ -1881,7 +1852,7 @@ bool borg_think_dungeon(void)
     /*** Leave the level XXX XXX XXX ***/
 
     /* Leave the level */
-    if ((borg.goal.leaving && !borg.goal.recalling && !unique_on_level)
+    if ((borg.goal.leaving && !borg.goal.recalling && !borg.mon.unique)
         || (borg.trait[BI_CDEPTH] && borg.trait[BI_CLEVEL] < 25
             && borg.trait[BI_GOLD] < 25000 && borg_count_sell() >= 13)) {
         if (borg.ready_morgoth == 0 && !OPT(player, birth_force_descend)) {
@@ -1970,7 +1941,7 @@ bool borg_think_dungeon(void)
 
     /*** Explore the dungeon ***/
 
-    if (vault_on_level) {
+    if (borg.status.vault) {
 
         /* Chase close monsters */
         if (borg_flow_kill(false, z_info->max_range + 1))
@@ -2039,7 +2010,8 @@ bool borg_think_dungeon(void)
         return true;
 
     /* Search for secret door via spell before spastic */
-    if (!borg.when_detect_doors || (borg_t - borg.when_detect_doors >= 500)) {
+    if (!borg.time.detect_doors
+        || (borg_timer(borg.time.detect_doors) >= 500)) {
         if (borg_check_light())
             return true;
     }
@@ -2071,7 +2043,8 @@ bool borg_think_dungeon(void)
     }
 
     /* Search for secret door via spell before spastic */
-    if (!borg.when_detect_doors || (borg_t - borg.when_detect_doors >= 500)) {
+    if (!borg.time.detect_doors
+        || (borg_timer(borg.time.detect_doors) >= 500)) {
         if (borg_check_light())
             return true;
     }
@@ -2108,23 +2081,23 @@ bool borg_think_dungeon(void)
      * twitchy behavior.  So we reset the level if this happens.  That will
      * force him to go shopping all over again.
      */
-    if ((borg.trait[BI_CDEPTH] == 0 && borg_t - borg_began > 800)
-        || borg_t > 28000)
-        old_depth = 126;
+    if ((borg.trait[BI_CDEPTH] == 0 && borg_timer(borg.time.level) > 800)
+        || borg_timer(borg.time.level) > 28000)
+        borg.status.old_depth = 126;
 
     /* Set a flag that the borg is  not allowed to retreat for 5 rounds */
     borg.no_retreat = 5;
 
     /* Boost slightly */
-    if (avoidance < borg.trait[BI_CURHP] * 2) {
+    if (borg.avoidance < borg.trait[BI_CURHP] * 2) {
         bool done = false;
 
         /* Note */
-        borg_note(format("# Boosting bravery (1) from %d to %d!", avoidance,
+        borg_note(format("# Boosting bravery (1) from %d to %d!", borg.avoidance,
             borg.trait[BI_CURHP] * 2));
 
         /* Ignore some danger */
-        avoidance = (borg.trait[BI_CURHP] * 2);
+        borg.avoidance = (borg.trait[BI_CURHP] * 2);
 
         /* Forget the danger fields */
         borg_danger_wipe = true;
@@ -2134,7 +2107,7 @@ bool borg_think_dungeon(void)
             done = true;
 
         /* Reset "avoidance" */
-        avoidance = borg.trait[BI_CURHP];
+        borg.avoidance = borg.trait[BI_CURHP];
 
         /* Re-calculate danger */
         borg_danger_wipe = true;
@@ -2170,15 +2143,15 @@ bool borg_think_dungeon(void)
     borg.no_retreat = 10;
 
     /* Boost some more */
-    if (avoidance < borg.trait[BI_MAXHP] * 4) {
+    if (borg.avoidance < borg.trait[BI_MAXHP] * 4) {
         bool done = false;
 
         /* Note */
-        borg_note(format("# Boosting bravery (2) from %d to %d!", avoidance,
-            borg.trait[BI_MAXHP] * 4));
+        borg_note(format("# Boosting bravery (2) from %d to %d!",
+            borg.avoidance, borg.trait[BI_MAXHP] * 4));
 
         /* Ignore some danger */
-        avoidance = (borg.trait[BI_MAXHP] * 4);
+        borg.avoidance = (borg.trait[BI_MAXHP] * 4);
 
         /* Forget the danger fields */
         borg_danger_wipe = true;
@@ -2188,7 +2161,7 @@ bool borg_think_dungeon(void)
             done = true;
 
         /* Reset "avoidance" */
-        avoidance = borg.trait[BI_CURHP];
+        borg.avoidance = borg.trait[BI_CURHP];
 
         /* Re-calculate danger */
         borg_danger_wipe = true;
@@ -2202,25 +2175,25 @@ bool borg_think_dungeon(void)
     }
 
     /* Boost a lot */
-    if (avoidance < 30000) {
+    if (borg.avoidance < 30000) {
         bool done = false;
 
         /* Note */
-        borg_note(
-            format("# Boosting bravery (3) from %d to %d!", avoidance, 30000));
+        borg_note(format(
+            "# Boosting bravery (3) from %d to %d!", borg.avoidance, 30000));
 
         /* Ignore some danger */
-        avoidance = 30000;
+        borg.avoidance = 30000;
 
         /* Forget the danger fields */
         borg_danger_wipe = true;
 
         /* Reset multiple factors to jumpstart the borg */
-        unique_on_level   = 0;
-        scaryguy_on_level = false;
+        borg.mon.unique   = 0;
+        borg.mon.scary = false;
 
         /* reset our breeder flag */
-        breeder_level = false;
+        borg.near.breeder = false;
 
         /* Forget goals */
         borg.goal.type = 0;
@@ -2260,7 +2233,7 @@ bool borg_think_dungeon(void)
             done = true;
 
         /* Reset "avoidance" */
-        avoidance = borg.trait[BI_CURHP];
+        borg.avoidance = borg.trait[BI_CURHP];
 
         /* Re-calculate danger */
         borg_danger_wipe = true;
@@ -2302,11 +2275,11 @@ bool borg_think_dungeon(void)
     }
 
     /* Reset multiple factors to jumpstart the borg */
-    unique_on_level   = 0;
-    scaryguy_on_level = false;
+    borg.mon.unique   = 0;
+    borg.mon.scary = false;
 
     /* reset our breeder flag */
-    breeder_level = false;
+    borg.near.breeder = false;
 
     /* No objects here */
     borg_takes_cnt = 0;

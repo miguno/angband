@@ -416,6 +416,7 @@ add_executable(OurExecutable
         $<$<BOOL:${SUPPORT_SDL2_FRONTEND}>:src/main-sdl2.c>
         $<$<BOOL:${SUPPORT_SDL2_FRONTEND}>:src/sdl2/pui-ctrl.c>
         $<$<BOOL:${SUPPORT_SDL2_FRONTEND}>:src/sdl2/pui-dlg.c>
+        $<$<BOOL:${SUPPORT_SDL2_FRONTEND}>:src/sdl2/pui-foc.c>
         $<$<BOOL:${SUPPORT_SDL2_FRONTEND}>:src/sdl2/pui-misc.c>
         $<$<BOOL:${SUPPORT_WINDOWS_FRONTEND}>:${OUR_WINDOWS_RC}>
         $<$<BOOL:${SUPPORT_WINDOWS_FRONTEND}>:src/main-win.c>
@@ -855,6 +856,7 @@ set(ANGBAND_TEST_CASE_SOURCES
     effects/info.c
     game/basic.c
     game/mage.c
+    game/status.c
     message/message.c
     monster/attack.c
     monster/desc.c
@@ -916,6 +918,7 @@ set(ANGBAND_TEST_CASE_SOURCES
     player/timed.c
     player/util.c
     trivial/trivial.c
+    z-bitflag/bitflag.c
     z-dice/dice.c
     z-expression/expression.c
     z-file/filename-index.c

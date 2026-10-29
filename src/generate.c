@@ -39,6 +39,7 @@
 #include "mon-move.h"
 #include "mon-spell.h"
 #include "monster.h"
+#include "obj-pile.h"
 #include "obj-tval.h"
 #include "obj-util.h"
 #include "object.h"
@@ -1152,6 +1153,7 @@ static struct chunk *cave_generate(struct player *p, int height, int width)
 			dun->persist = false;
 		}
 
+		dun->forced_descent = OPT(p, birth_force_descend);
 
 		/* Choose a profile and build the level */
 		dun->profile = choose_profile(p);
@@ -1339,6 +1341,47 @@ static void sanitize_player_loc(struct chunk *c, struct player *p)
 }
 
 /**
+ * Forget the current level and any resources associated with it.
+ */
+static void forget_cave(struct player *p)
+{
+	/* Forget knowledge of old level */
+	if (p->cave) {
+		struct loc grid;
+
+		/* Deal with artifacts */
+		for (grid.y = 0; grid.y < cave->height; grid.y++) {
+			for (grid.x = 0; grid.x < cave->width; grid.x++) {
+				struct object *obj = square_object(cave, grid);
+
+				while (obj) {
+					if (obj->artifact) {
+						bool found = obj_is_known_artifact(obj);
+						if (OPT(p, birth_lose_arts) || found) {
+							history_lose_artifact(p, obj->artifact);
+							mark_artifact_created(obj->artifact, true);
+						} else {
+							mark_artifact_created(obj->artifact, false);
+						}
+					}
+					obj = obj->next;
+				}
+			}
+		}
+
+		/* Free the known cave */
+		cave_free(p->cave);
+		p->cave = NULL;
+	}
+
+	/* Clear the old cave */
+	if (cave) {
+		cave_clear(cave, p);
+		cave = NULL;
+	}
+}
+
+/**
  * Prepare the level the player is about to enter, either by generating
  * or reloading
  *
@@ -1347,6 +1390,8 @@ static void sanitize_player_loc(struct chunk *c, struct player *p)
 void prepare_next_level(struct player *p)
 {
 	bool persist = OPT(p, birth_levels_persist) || p->upkeep->arena_level;
+	/* Assume the old level was not an arena, adjust that below. */
+	bool old_arena = false;
 
 	/* Deal with any existing current level */
 	if (character_dungeon) {
@@ -1357,14 +1402,20 @@ void prepare_next_level(struct player *p)
 			if (!cave->name || !streq(cave->name, "arena")) {
 				/* Tidy up */
 				compact_monsters(cave, 0);
+
+				/*
+				 * Leave the player marker if going to an
+				 * arena; otherwise, clear that marker.
+				 */
 				if (!p->upkeep->arena_level) {
-					/* Leave the player marker if going to an arena */
 					square_set_mon(cave, p->grid, 0);
 				}
 
 				/* Save level and known level */
 				cave_store(cave, false, true);
 				cave_store(p->cave, true, true);
+			} else {
+				old_arena = true;
 			}
 		} else {
 			/* Save the town */
@@ -1372,59 +1423,68 @@ void prepare_next_level(struct player *p)
 				cave_store(cave, false, false);
 			}
 
-			/* Forget knowledge of old level */
-			if (p->cave) {
-				int x, y;
-
-				/* Deal with artifacts */
-				for (y = 0; y < cave->height; y++) {
-					for (x = 0; x < cave->width; x++) {
-						struct object *obj = square_object(cave, loc(x, y));
-						while (obj) {
-							if (obj->artifact) {
-								bool found = obj_is_known_artifact(obj);
-								if (OPT(p, birth_lose_arts) || found) {
-									history_lose_artifact(p, obj->artifact);
-									mark_artifact_created(obj->artifact, true);
-								} else {
-									mark_artifact_created(obj->artifact, false);
-								}
-							}
-
-							obj = obj->next;
-						}
-					}
-				}
-
-				/* Free the known cave */
-				cave_free(p->cave);
-				p->cave = NULL;
-			}
-
-			/* Clear the old cave */
-			if (cave) {
-				cave_clear(cave, p);
-				cave = NULL;
-			}
+			forget_cave(p);
 		}
 	}
 
 	/* Prepare the new level */
 	if (persist) {
 		char *name = level_by_depth(p->depth)->name;
-		struct chunk *old_level = chunk_find_name(name);
+		struct chunk *new_level = chunk_find_name(name);
 
-		/* If we found an old level, load the known level and assign */
-		if (old_level && (old_level != cave)) {
+		/* If we found a saved copy of the new level, load it */
+		if (new_level && (new_level != cave)) {
 			int i;
-			bool arena = cave->name && streq(cave->name, "arena");
 			char *known_name = string_make(format("%s known", name));
-			struct chunk *old_known = chunk_find_name(known_name);
-			assert(old_known);
+			struct chunk *new_known = chunk_find_name(known_name);
+			assert(new_known);
+
+			if (old_arena) {
+				/*
+				 * Since the arena was not saved or cleared
+				 * earlier, do it now.  As the arena monster
+				 * is a copy, without full accounting, of a
+				 * monster in the saved dungeon, clear its race
+				 * to avoid double counting in wipe_mon_list()
+				 * and clean up any objects it holds (it started
+				 * with none so those objects are ones it picked
+				 * up in the arena) to avoid memory leaks.  The
+				 * object cleanup mimics what wipe_mon_list()
+				 * does.
+				 */
+				struct monster *saved_mon =
+					&new_level->monsters[1];
+				struct monster *arena_mon =
+					&cave->monsters[1];
+				struct object *obj = arena_mon->held_obj;
+
+				arena_mon->race = NULL;
+				while (obj) {
+					if (obj->artifact && !obj_is_known_artifact(obj)) {
+						mark_artifact_created(
+							obj->artifact, false);
+					}
+					if (obj->oidx) {
+						cave->objects[obj->oidx] = NULL;
+					}
+					obj = obj->next;
+				}
+				object_pile_free(cave, player->cave,
+					arena_mon->held_obj);
+
+				forget_cave(p);
+
+				/*
+				 * Point p->upkeep->health_who at the monster
+				 * that went to the arena.
+				 */
+				assert(saved_mon->race);
+				p->upkeep->health_who = saved_mon;
+			}
 
 			/* Assign the new ones */
-			cave = old_level;
-			p->cave = old_known;
+			cave = new_level;
+			p->cave = new_known;
 
 			/* Associate known objects */
 			for (i = 0; i < p->cave->obj_max; i++) {
@@ -1436,9 +1496,21 @@ void prepare_next_level(struct player *p)
 			/* Allow monsters to recover */
 			restore_monsters();
 
+			/*
+			 * Age player-caused scent trails for the time elapsed
+			 * since last on the level.  Forget the noise caused
+			 * by the player.  With enough speed or movement speed
+			 * bonuses, it can be possible to return to a level
+			 * before a noise calculation was triggered on a
+			 * different level, but it is not worth bothering over
+			 * those situations.
+			 */
+			age_scent();
+			forget_noise();
+
 			/* Leaving arenas requires special treatment */
-			if (arena) {
-				int y, x;
+			if (old_arena) {
+				struct loc grid;
 				bool found = false;
 
 				/* Use the stored player grid */
@@ -1450,9 +1522,11 @@ void prepare_next_level(struct player *p)
 
 				/* Look for the old player mark, place them by hand */
 				if (!found) {
-					for (y = 0; y < cave->height; y++) {
-						for (x = 0; x < cave->width; x++) {
-							struct loc grid = loc(x, y);
+					for (grid.y = 0; grid.y < cave->height;
+							grid.y++) {
+						for (grid.x = 0; grid.x
+								< cave->width;
+								grid.x++) {
 							if (square(cave, grid)->mon == -1) {
 								p->grid = grid;
 								found = true;
@@ -1469,9 +1543,8 @@ void prepare_next_level(struct player *p)
 					int ty = cave->monsters[1].grid.y;
 					int tx = cave->monsters[1].grid.x;
 					for (k = 1; k < 10; k++) {
-						for (y = ty - k; y <= ty + k; y++) {
-							for (x = tx - k; x <= tx + k; x++) {
-								struct loc grid = loc(x, y);
+						for (grid.y = ty - k; grid.y <= ty + k; grid.y++) {
+							for (grid.x = tx - k; grid.x <= tx + k; grid.x++) {
 								if (square_in_bounds_fully(cave, grid) &&
 									square_isempty(cave, grid) &&
 									!square_isvault(cave, grid)) {
@@ -1507,12 +1580,15 @@ void prepare_next_level(struct player *p)
 			string_free(known_name);
 		} else if (p->upkeep->arena_level) {
 			/* We're creating a new arena level */
+			assert(!old_arena);
 			cave = cave_generate(p, 6, 6);
 			event_signal_flag(EVENT_GEN_LEVEL_END, true);
 		} else {
 			/* Check dimensions */
 			struct level *lev;
 			int min_height = 0, min_width = 0;
+
+			assert(!old_arena);
 
 			/* Check level above */
 			lev = level_by_depth(p->depth - 1);
@@ -1550,6 +1626,13 @@ void prepare_next_level(struct player *p)
 		}
 
 	}
+
+	/*
+	 * The player has not been on the level long enough to generate noise
+	 * yet.
+	 */
+	p->noise_grid.x = 0;
+	p->noise_grid.y = 0;
 
 	/* The dungeon is ready */
 	character_dungeon = true;

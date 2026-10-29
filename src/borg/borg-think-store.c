@@ -22,16 +22,15 @@
 #ifdef ALLOW_BORG
 
 #include "../store.h"
-#include "../ui-menu.h"
 
 #include "borg-io.h"
-#include "borg-inventory.h"
 #include "borg-item-wear.h"
 #include "borg-item.h"
 #include "borg-store-buy.h"
 #include "borg-store-sell.h"
 #include "borg-store.h"
 #include "borg-think.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -94,9 +93,9 @@ bool borg_choose_shop(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg_t - borg_began > 2000)
+    if (borg_timer(borg.time.level) > 2000)
         return false;
-    if (borg.time_this_panel > 1350)
+    if (borg.antibounce_count > 1350)
         return false;
 
     /* Already flowing to a store to sell something */
@@ -285,25 +284,32 @@ bool borg_choose_shop(void)
  */
 bool borg_think_store(void)
 {
+    /* Cheat the store number */
+    shop_num = square_shopnum(cave, player->grid);
+
+    /* Clear the goal (the goal was probably going to a shop number) */
+    borg.goal.type = 0;
+
+    /* Recheck spells */
+    borg_do_spell = true;
+
+    /* Allow user abort */
+    if (borg.status.cancel)
+        return true;
+
+    /* Do not allow a user key to interrupt the borg while in a store */
+    borg.in_shop = true;
+
     /* HACK: Prevent clock wrapping */
-    if (borg_t >= 20000 && borg_t <= 20010) {
+    if (borg_timer(borg.time.level) >= 20000
+        && borg_timer(borg.time.level) <= 20010) {
         /* Clear Possible errors and leave the store */
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
-
-        /* Re-examine inven and equip */
-        borg_do_inven = true;
-        borg_do_equip = true;
         return true;
     }
-
-    /* update all my equipment and swap items */
-    borg_do_inven = true;
-    borg_do_equip = true;
-    borg_notice(true);
-
 
     /* Wear "optimal" equipment */
     if (borg_best_stuff())

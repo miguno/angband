@@ -154,6 +154,8 @@ static void borg_note_internal(bool warning, const char *what)
         msg("%s", what);
     } else {
         message_add(what, MSG_GENERIC);
+        /* Send refresh event */
+        event_signal_message(EVENT_MESSAGE, MSG_GENERIC, NULL);
     }
 
     /* Log the message */
@@ -162,9 +164,9 @@ static void borg_note_internal(bool warning, const char *what)
     /* Mega-Hack -- Check against the swap loops */
     if (strstr(what, "Best Combo") || strstr(what, "Taking off ")) {
         /* Tick the anti loop clock */
-        borg.time_this_panel += 10;
+        borg.antibounce_count += 10;
         borg_note(
-            format("# Anti-loop variable tick (%d).", borg.time_this_panel));
+            format("# Anti-loop variable tick (%d).", borg.antibounce_count));
     }
 
     /* Scan windows */
@@ -186,7 +188,7 @@ static void borg_note_internal(bool warning, const char *what)
         Term_locate(&x, &y);
 
         /* Erase current line */
-        Term_erase(0, y, 255);
+        Term_erase(0, y, w);
 
         /* Total length */
         n = strlen(what);
@@ -227,7 +229,7 @@ static void borg_note_internal(bool warning, const char *what)
                     y = 0;
 
                 /* Erase next line */
-                Term_erase(0, y, 255);
+                Term_erase(0, y, w);
 
                 /* Advance */
                 what += k;
@@ -244,7 +246,7 @@ static void borg_note_internal(bool warning, const char *what)
                 y = 0;
 
             /* Erase next line */
-            Term_erase(0, y, 255);
+            Term_erase(0, y, w);
         }
 
         /* Normal */
@@ -257,7 +259,7 @@ static void borg_note_internal(bool warning, const char *what)
                 y = 0;
 
             /* Erase next line */
-            Term_erase(0, y, 255);
+            Term_erase(0, y, w);
         }
 
         /* Flush output */
@@ -336,7 +338,7 @@ errr borg_keypress(keycode_t k)
 /*
  * Add a keypress to the history of what has been passed back to the game
  */
-struct keypress save_keypress_history(struct keypress kp)
+struct keypress borg_save_keypress(struct keypress kp)
 {
     /* Note the keypress */
     if (borg_cfg[BORG_VERBOSE]) {
@@ -507,6 +509,8 @@ static void borg_bell(game_event_type unused, game_event_data *data, void *user)
 
 void borg_init_io(void)
 {
+    borg_free_io();
+
     /* Allocate the "keypress queue" */
     borg_key_queue = mem_zalloc(KEY_SIZE * sizeof(keycode_t));
 
@@ -521,10 +525,12 @@ void borg_free_io(void)
 {
     event_remove_handler(EVENT_BELL, borg_bell, NULL);
  
-    mem_free(borg_key_history);
+    if (borg_key_history)
+        mem_free(borg_key_history);
     borg_key_history = NULL;
 
-    mem_free(borg_key_queue);
+    if (borg_key_queue)
+        mem_free(borg_key_queue);
     borg_key_queue = NULL;
 }
 #endif

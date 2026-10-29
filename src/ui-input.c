@@ -396,7 +396,7 @@ static void msg_flush(int x)
 		anykey();
 
 	/* Clear the line */
-	Term_erase(0, 0, 255);
+	Term_erase(0, 0, Term->wid);
 }
 
 /**
@@ -647,7 +647,7 @@ void clear_from(int row)
 
 	/* Erase requested rows */
 	for (y = row; y < Term->hgt; y++)
-		Term_erase(0, y, 255);
+		Term_erase(0, y, Term->wid);
 }
 
 /**
@@ -2028,7 +2028,7 @@ bool textui_process_key(struct keypress kp, unsigned char *c, int count)
 	keycode_t key = kp.code;
 
 	/* Null command */
-	if (key == '\0' || key == ESCAPE || key == ' ' || key == '\a')
+	if (key == '\0' || key == ESCAPE || key == ' ')
 		return true;
 
 	/* Invalid keypress */

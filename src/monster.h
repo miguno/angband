@@ -306,19 +306,24 @@ struct monster_shape {
 };
 
 /**
- * Monster "race" information, including racial memories
+ * Monster "race" information
  *
  * Note that "d_attr" and "d_char" are used for MORE than "visual" stuff.
  *
  * Note that "cur_num" (and "max_num") represent the number of monsters
- * of the given race currently on (and allowed on) the current level.
- * This information yields the "dead" flag for Unique monsters.
- *
- * Note that "max_num" is reset when a new player is created.
- * Note that "cur_num" is reset when a new level is created.
+ * of the given race currently present (and allowed).  "cur_num" only accounts
+ * for the original race of the monster and is not adjusted for shape changes.
+ * Without persistent levels, cur_num is the number of monsters of the given
+ * race on the current level (if in a Single Combat arena it is the number of
+ * monsters on the level where Single Combat was cast).  With persistent levels,
+ * the numbers are across all visited levels.  When a Single Combat arena is
+ * active, the monster taken to the arena is only counted once even though it
+ * appears both in the arena and in the level where Single Combat was cast.
+ * "cur_num" and "max_num" are reset when a new player is created.
  *
  * Maybe "cur_num", and "max_num" should be moved out of this array since
- * they are not read from "monster.txt".
+ * they are not read from "monster.txt" and are the only fields affected by
+ * the contents of the save file.
  */
 struct monster_race {
 	struct monster_race *next;
@@ -358,8 +363,8 @@ struct monster_race {
 	uint8_t d_attr;			/* Default monster attribute */
 	wchar_t d_char;			/* Default monster character */
 
-	uint8_t max_num;		/* Maximum population allowed per level */
-	int cur_num;			/* Monster population on current level */
+	uint8_t max_num;		/* Maximum population allowed */
+	int cur_num;			/* Current monster population */
 
 	struct monster_altmsg *spell_msgs;
 	struct monster_drop *drops;
@@ -373,6 +378,15 @@ struct monster_race {
 	int num_shapes;
 };
 
+/**
+ * The portions of the player state a monster can learn
+ */
+struct monster_learned_player {
+	bitflag flags[OF_SIZE];		/**< object flags applied to the
+						player from the race or items */
+	bitflag pflags[PF_SIZE];	/**< intrinsic player flags */
+	int16_t res_level[ELEM_MAX];	/**< elemental resistances */
+};
 
 /**
  * Monster information, for a specific monster.
@@ -406,7 +420,8 @@ struct monster {
 
 	uint8_t attr;  				/* attr last used for drawing monster */
 
-	struct player_state known_pstate;	/* Known player state */
+	struct monster_learned_player known_pstate;
+						/* Known player state */
 
 	struct target target;			/* Monster target */
 

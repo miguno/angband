@@ -232,7 +232,7 @@ static void wr_monster(const struct monster *mon)
 		wr_byte(mon->known_pstate.flags[j]);
 
 	for (j = 0; j < ELEM_MAX; j++)
-		wr_s16b(mon->known_pstate.el_info[j].res_level);
+		wr_s16b(mon->known_pstate.res_level[j]);
 
 	/* Write mimicked object marker, if any */
 	if (mon->mimicked_obj) {
@@ -485,8 +485,9 @@ void wr_player(void)
 	/* More info */
 	wr_byte(player->old_grid.y);
 	wr_byte(player->old_grid.x);
-	wr_s16b(0);	/* oops */
-	wr_s16b(0);	/* oops */
+	wr_u16b(player->noise_falloff);
+	wr_byte(player->noise_grid.y);
+	wr_byte(player->noise_grid.x);
 	wr_byte(player->skip_cmd_coercion);
 	wr_byte(player->unignoring);
 	wr_s16b(player->deep_descent);

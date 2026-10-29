@@ -22,6 +22,7 @@
 
 #ifdef ALLOW_BORG
 
+#include "borg.h"
 #include "borg-home-notice.h"
 #include "borg-magic.h"
 #include "borg-trait.h"

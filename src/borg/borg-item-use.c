@@ -30,6 +30,7 @@
 #include "borg-item-analyze.h"
 #include "borg-item-val.h"
 #include "borg-magic.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -44,18 +45,18 @@
  */
 bool borg_quaff_crit(bool no_check)
 {
-    static int16_t when_last_quaff = 0;
+    static borg_time when_last_quaff = 0;
 
     if (no_check) {
         if (borg_quaff_potion(sv_potion_cure_critical)) {
-            when_last_quaff = borg_t;
+            when_last_quaff = borg.time.now;
             return true;
         }
         return false;
     }
 
     /* Avoid drinking CCW twice in a row */
-    if (when_last_quaff > (borg_t - 4) && when_last_quaff <= borg_t
+    if (borg_timer(when_last_quaff) > 4 && borg_timer(when_last_quaff) > 0
         && (randint1(100) < 75))
         return false;
 
@@ -64,7 +65,7 @@ bool borg_quaff_crit(bool no_check)
         return false;
 
     if (borg_quaff_potion(sv_potion_cure_critical)) {
-        when_last_quaff = borg_t;
+        when_last_quaff = borg.time.now;
         return true;
     }
     return false;

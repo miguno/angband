@@ -302,7 +302,7 @@ static bool rd_monster(struct chunk *c, struct monster *mon)
 		rd_byte(&mon->known_pstate.flags[j]);
 
 	for (j = 0; j < elem_max; j++)
-		rd_s16b(&mon->known_pstate.el_info[j].res_level);
+		rd_s16b(&mon->known_pstate.res_level[j]);
 
 	rd_u16b(&tmp16u);
 
@@ -761,6 +761,18 @@ int rd_player(void)
 	rd_s32b(&player->exp);
 	rd_u16b(&player->exp_frac);
 
+	/* Verify experience. */
+	if (player->max_exp < 0 || player->max_exp > PY_MAX_EXP) {
+		note(format("Invalid player maximum experience (%ld).\n",
+			(long)player->max_exp));
+		return -1;
+	}
+	if (player->exp < 0 || player->exp > player->max_exp) {
+		note(format("Invalid player experience (%ld).\n",
+			(long)player->exp));
+		return -1;
+	}
+
 	rd_s16b(&player->lev);
 
 	/* Verify player level */
@@ -798,7 +810,11 @@ int rd_player(void)
 	player->old_grid.y = tmp8u;
 	rd_byte(&tmp8u);
 	player->old_grid.x = tmp8u;
-	strip_bytes(4);
+	rd_u16b(&player->noise_falloff);
+	rd_byte(&tmp8u);
+	player->noise_grid.y = tmp8u;
+	rd_byte(&tmp8u);
+	player->noise_grid.x = tmp8u;
 	rd_byte(&player->skip_cmd_coercion);
 	rd_byte(&player->unignoring);
 	rd_s16b(&player->deep_descent);

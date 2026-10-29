@@ -52,7 +52,7 @@
 #include "borg-projection.h"
 #include "borg-prepared.h"
 #include "borg-reincarnate.h"
-#include "borg-store.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-update.h"
 
 struct borg_commands
@@ -212,10 +212,10 @@ static void borg_cmd_start(void)
     borg_clear_best();
 
     /* Activate */
-    borg_active = true;
+    borg.status.active = true;
 
     /* Reset cancel */
-    borg_cancel = false;
+    borg.status.cancel = false;
 
     /* Step forever */
     borg_step = 0;
@@ -227,10 +227,6 @@ static void borg_cmd_start(void)
 
     /* Message */
     borg_note("# Installing keypress hook");
-
-    /* If the clock overflowed, fix that  */
-    if (borg_t > 9000)
-        borg_t = 9000;
 
     /* Activate the key stealer */
     borg_update_entrypoint(true);
@@ -260,17 +256,17 @@ static void borg_cmd_avoidances(void)
             p = borg_danger(y, x, 1, true, false);
 
             /* Skip non-avoidances */
-            if (p < avoidance / 10)
+            if (p < borg.avoidance / 10)
                 continue;
 
             /* Use colors for less painful */
-            if (p < avoidance / 2)
+            if (p < borg.avoidance / 2)
                 a = COLOUR_ORANGE;
-            if (p < avoidance / 4)
+            if (p < borg.avoidance / 4)
                 a = COLOUR_YELLOW;
-            if (p < avoidance / 6)
+            if (p < borg.avoidance / 6)
                 a = COLOUR_GREEN;
-            if (p < avoidance / 8)
+            if (p < borg.avoidance / 8)
                 a = COLOUR_BLUE;
 
             /* Display */
@@ -281,7 +277,7 @@ static void borg_cmd_avoidances(void)
     /* Get keypress */
     msg("(%d,%d of %d,%d) Avoidance value %d.", borg.c.y, borg.c.x,
         Term->offset_y / borg_panel_hgt(),
-        Term->offset_x / borg_panel_wid(), avoidance);
+        Term->offset_x / borg_panel_wid(), borg.avoidance);
     event_signal(EVENT_MESSAGE_FLUSH);
 }
 
@@ -296,10 +292,10 @@ static void borg_cmd_step(void)
     borg_clear_best();
 
     /* Activate */
-    borg_active = true;
+    borg.status.active = true;
 
     /* Reset cancel */
-    borg_cancel = false;
+    borg.status.cancel = false;
 
     /* Step N times */
     borg_step = get_quantity("Step how many times? ", 1000);
@@ -311,10 +307,6 @@ static void borg_cmd_step(void)
     /* Message */
     borg_note("# Installing keypress hook");
     borg_note(format("# Stepping Borg %d times", borg_step));
-
-    /* If the clock overflowed, fix that  */
-    if (borg_t > 9000)
-        borg_t = 9000;
 
     /* Activate the key stealer */
     borg_update_entrypoint(true);
@@ -329,10 +321,10 @@ static void borg_cmd_update(void)
     borg_reinit_options();
 
     /* Activate */
-    borg_active = true;
+    borg.status.active = true;
 
     /* Immediate cancel */
-    borg_cancel = true;
+    borg.status.cancel = true;
 
     /* Step forever */
     borg_step = 0;
@@ -461,8 +453,8 @@ static void borg_cmd_flags(void)
  */
 static void borg_cmd_cheat(void)
 {
-    borg_cheat_death = !borg_cheat_death;
-    msg("Borg -- borg_cheat_death is now %d.", borg_cheat_death);
+    borg.status.cheat_death = !borg.status.cheat_death;
+    msg("Borg -- borg_cheat_death is now %d.", borg.status.cheat_death);
 }
 
 /*
@@ -835,7 +827,7 @@ static void borg_cmd_grid_objects(void)
         borg_take* take = &borg_takes[i];
 
         /* Still alive */
-        if (take->kind) {
+        if (take->kidx) {
             int x = take->x;
             int y = take->y;
 
@@ -1011,17 +1003,17 @@ static void borg_cmd_fear(void)
             p = borg_fear_region[y / 11][x / 11];
 
             /* Skip non-fears */
-            if (p < avoidance / 10)
+            if (p < borg.avoidance / 10)
                 continue;
 
             /* Use colors = less painful */
-            if (p < avoidance / 2)
+            if (p < borg.avoidance / 2)
                 a = COLOUR_ORANGE;
-            if (p < avoidance / 4)
+            if (p < borg.avoidance / 4)
                 a = COLOUR_YELLOW;
-            if (p < avoidance / 6)
+            if (p < borg.avoidance / 6)
                 a = COLOUR_GREEN;
-            if (p < avoidance / 8)
+            if (p < borg.avoidance / 8)
                 a = COLOUR_BLUE;
 
             /* Display */
@@ -1055,23 +1047,23 @@ static void borg_cmd_fear(void)
                 a = COLOUR_L_BLUE;
 
             /* Color Defines */
-            if (p < avoidance / 20 && p > 1)
+            if (p < borg.avoidance / 20 && p > 1)
                 a = COLOUR_BLUE;
 
             /* Color Defines */
-            if (p < avoidance / 10 && p > avoidance / 20)
+            if (p < borg.avoidance / 10 && p > borg.avoidance / 20)
                 a = COLOUR_GREEN;
 
             /* Color Defines */
-            if (p < avoidance / 4 && p > avoidance / 10)
+            if (p < borg.avoidance / 4 && p > borg.avoidance / 10)
                 a = COLOUR_YELLOW;
 
             /* Color Defines */
-            if (p < avoidance / 2 && p > avoidance / 4)
+            if (p < borg.avoidance / 2 && p > borg.avoidance / 4)
                 a = COLOUR_ORANGE;
 
             /* Color Defines */
-            if (p > avoidance / 2)
+            if (p > borg.avoidance / 2)
                 a = COLOUR_RED;
 
             /* Display */
@@ -1094,12 +1086,10 @@ static void borg_cmd_fear(void)
  */
 static void borg_cmd_time(void)
 {
-    int32_t time = borg_t - borg_began;
-    msg("time: (%d) ", time);
-    time = (borg_time_town + (borg_t - borg_began));
-    msg("; from town (%d)", time);
-    msg("; on this panel (%d)", borg.time_this_panel);
-    msg("; need inviso (%d)", borg.need_see_invis);
+    msg("time: (%ld) ", (long int)borg.time.now);
+    msg("; from town (%ld)", (long int)borg_timer(borg.time.town));
+    msg("; bounciness (%ld)", (long int)borg.antibounce_count);
+    msg("; when inviso (%ld)", (long int)borg.need_see_invis);
 }
 
 /*
@@ -1173,14 +1163,8 @@ static void borg_cmd_power(void)
 {
     int32_t p;
 
-    /* Cheat the "equip" screen */
-    borg_cheat_equip();
-
-    /* Cheat the "inven" screen */
-    borg_cheat_inven();
-
-    /* Cheat the "inven" screen */
-    borg_cheat_store();
+    /* find all items currently in use */
+    borg_find_all_items();
 
     /* Examine the screen */
     borg_notice(true);
@@ -1208,10 +1192,8 @@ static void borg_cmd_prepare(void)
 {
     int i = 0;
 
-    /* Extract some "hidden" variables */
-    /* note: if we recode to do screen scraping again, this will fail */
-    borg_cheat_equip();
-    borg_cheat_inven();
+    /* find all items currently in use */
+    borg_find_all_items();
 
     borg_notice(true);
 
@@ -1265,10 +1247,8 @@ static void borg_cmd_swaps(void)
 {
     borg_item* item;
 
-    /* Cheat the "equip" screen */
-    borg_cheat_equip();
-    /* Cheat the "inven" screen */
-    borg_cheat_inven();
+    /* find all items currently in use */
+    borg_find_all_items();
 
     /* Examine the inventory */
     borg_notice(true);
@@ -1390,11 +1370,9 @@ static void borg_cmd_has(void)
         to = BI_MAX;
         break;
     }
-    /* Cheat the "equip" screen */
-    borg_cheat_equip();
 
-    /* Cheat the "inven" screen */
-    borg_cheat_inven();
+    /* find all items currently in use */
+    borg_find_all_items();
 
     /* Examine the screen */
     borg_notice(true);
@@ -1453,7 +1431,7 @@ static void borg_cmd_has(void)
 static void borg_cmd_dump(void)
 {
     /* Cheat the "inven" screen */
-    borg_cheat_inven();
+    borg_inventory();
 
     borg_write_map(true);
 }
@@ -1479,10 +1457,9 @@ static void borg_cmd_object_desc(void)
     // XXX replace this with an item selector
     n = get_quantity("Which item?", z_info->pack_size);
 
-    /* Cheat the "equip" screen */
-    borg_cheat_equip();
-    /* Cheat the "inven" screen */
-    borg_cheat_inven();
+    /* find all items currently in use */
+    borg_find_all_items();
+
     /* Examine the inventory */
     borg_notice(true);
     borg_notice_home(NULL, false);
@@ -1520,7 +1497,8 @@ static void borg_cmd_respawn(void)
     get_com("Are you sure you want to Respawn this borg? (y or n)? ", &cmd);
 
     if (cmd == 'y' || cmd == 'Y') {
-        reincarnate_borg();
+        borg_force_reincarnate();
+        borg_cmd_start();
     }
 }
 

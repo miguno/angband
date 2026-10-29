@@ -23,10 +23,10 @@
 
 #include "../obj-desc.h"
 
+#include "borg.h"
 #include "borg-item-analyze.h"
 #include "borg-item-id.h"
 #include "borg-item.h"
-#include "borg-trait.h"
 
 /*
  * track if we need to crush junk
@@ -158,7 +158,7 @@ static void borg_cheat_quiver(void)
                 borg_item_analyze(&borg_items[i], obj, buf, false);
 
                 /* Uninscribe items with ! or borg inscriptions */
-                if (borg_items[i].note && (strstr(borg_items[i].note, "!") 
+                if (borg_items[i].note && (strstr(borg_items[i].note, "!")
                     || strstr(borg_items[i].note, "borg")))
                     borg_deinscribe(i);
             }
@@ -169,7 +169,7 @@ static void borg_cheat_quiver(void)
 /*
  * Cheat the "equip" screen
  */
-void borg_cheat_equip(void)
+void borg_equipment(void)
 {
 	char buf[256];
 
@@ -211,7 +211,7 @@ void borg_cheat_equip(void)
 /*
  * Cheat the "inven" screen
  */
-void borg_cheat_inven(void)
+void borg_inventory(void)
 {
     int i;
 
@@ -243,7 +243,7 @@ void borg_cheat_inven(void)
         borg_do_crush_junk = true;
 
         /* Uninscribe items with ! or borg inscriptions */
-        if (borg_items[i].note && (strstr(borg_items[i].note, "!") 
+        if (borg_items[i].note && (strstr(borg_items[i].note, "!")
             || strstr(borg_items[i].note, "borg")))
             borg_deinscribe(i);
     }

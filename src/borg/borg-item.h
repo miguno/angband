@@ -176,6 +176,9 @@ extern void borg_deinscribe(int i);
 /* helper to give weight of items */
 extern int16_t borg_item_weight(borg_item *item);
 
+/* Find all items */
+extern void borg_find_all_items(void);
+
 /* initialize and free items */
 extern void borg_init_item(void);
 extern void borg_free_item(void);

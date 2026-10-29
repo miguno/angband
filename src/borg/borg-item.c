@@ -21,11 +21,13 @@
 
 #ifdef ALLOW_BORG
 
-#include "../init.h"
 #include "../ui-menu.h"
 
+#include "borg-inventory.h"
 #include "borg-io.h"
 #include "borg-item-val.h"
+#include "borg-store.h"
+
 
 /*
  * Current "inventory"
@@ -108,6 +110,27 @@ int16_t borg_item_weight(borg_item * item)
 }
 
 /*
+ * Find all items
+ *   Fill out the borg_items array with the current inventory, equipment,
+ *  and store items.  Store a backup in safe_items.
+ */
+void borg_find_all_items(void) {
+
+    /* Find currently worn items */
+    borg_equipment();
+
+    /* Find currently carried items */
+    borg_inventory();
+
+    /* See what is in the stores */
+    borg_notice_store();
+
+    /* save the items.  safe_items, from here on, should never be changed, */
+    /* just copied from */
+    memcpy(safe_items, borg_items, QUIVER_END * sizeof(borg_item));
+}
+
+/*
  * allocate the item arrays
  */
 void borg_init_item(void)
@@ -128,10 +151,14 @@ void borg_free_item(void)
 {
     /*** Item/Ware arrays ***/
 
-    mem_free(safe_items);
-    safe_items = NULL;
-    mem_free(borg_items);
-    borg_items = NULL;
+    if (safe_items) {
+        mem_free(safe_items);
+        safe_items = NULL;
+    }
+    if (borg_items) {
+        mem_free(borg_items);
+        borg_items = NULL;
+    }
 }
 
 #endif

@@ -25,6 +25,7 @@
 #include "../player-spell.h"
 #include "../ui-menu.h"
 
+#include "borg.h"
 #include "borg-cave.h"
 #include "borg-cave-view.h"
 #include "borg-init.h"
@@ -32,10 +33,10 @@
 #include "borg-trait.h"
 
 /*
- * Spell info - individualized for class by spell number 
+ * Spell info - individualized for class by spell number
 */
 
-borg_magic *borg_magics = NULL; 
+borg_magic *borg_magics = NULL;
 
 
 static borg_spell_rating *borg_spell_ratings;
@@ -140,7 +141,7 @@ static borg_spell_rating borg_spell_ratings_NECROMANCER[] =
 {
     { "Nether Bolt", 95, NETHER_BOLT },
     { "Sense Invisible", 85, SENSE_INVISIBLE },
-    { "Create Darkness", 5, CREATE_DARKNESS }, 
+    { "Create Darkness", 5, CREATE_DARKNESS },
     { "Bat Form", 5, BAT_FORM }, // !FIX !TODO shapechange
     { "Read Minds", 85, READ_MINDS },
     { "Tap Unlife", 85, TAP_UNLIFE },
@@ -160,10 +161,10 @@ static borg_spell_rating borg_spell_ratings_NECROMANCER[] =
     { "Fume of Mordor", 75, FUME_OF_MORDOR },
     { "Storm of Darkness", 65, STORM_OF_DARKNESS },
     { "Power Sacrifice", 5, POWER_SACRIFICE },  /* not sure if this is borg happy. */
-    { "Zone of Unmagic", 5, ZONE_OF_UNMAGIC },  // !FIX !TODO defense?  not sure how to code. 
+    { "Zone of Unmagic", 5, ZONE_OF_UNMAGIC },  // !FIX !TODO defense?  not sure how to code.
     { "Vampire Form", 5, VAMPIRE_FORM }, // !FIX !TODO shapechange
     { "Curse", 65, CURSE },
-    { "Command", 5, COMMAND } // !FIX !TODO defense?  not sure how to code. 
+    { "Command", 5, COMMAND } // !FIX !TODO defense?  not sure how to code.
 };
 static borg_spell_rating borg_spell_ratings_PALADIN[] =
 {
@@ -206,7 +207,7 @@ static borg_spell_rating borg_spell_ratings_RANGER[] =
     { "Turn Stone to Mud", 85, TURN_STONE_TO_MUD },
     { "Sense Surroundings", 75, SENSE_SURROUNDINGS },
     { "Cover Tracks", 25, COVER_TRACKS }, // !FIX !TODO prep?
-    { "Create Arrows", 85, CREATE_ARROWS }, // !FIX !TODO 
+    { "Create Arrows", 85, CREATE_ARROWS }, // !FIX !TODO
     { "Haste Self", 95, HASTE_SELF },
     { "Decoy", 5, DECOY }, // !FIX !TODO not sure what to do with this
     { "Brand Ammunition", 95, BRAND_AMMUNITION }
@@ -226,7 +227,7 @@ static borg_spell_rating borg_spell_ratings_BLACKGUARD[] =
     { "Werewolf Form", 5, WEREWOLF_FORM }, // !FIX !TODO shapechange
     { "Bloodlust", 5, BLOODLUST }, /* seems to dangerous for borg right now */
     { "Unholy Reprieve", 95, UNHOLY_REPRIEVE },
-    { "Forceful Blow", 5, FORCEFUL_BLOW }, // !FIX !TODO need to code this 
+    { "Forceful Blow", 5, FORCEFUL_BLOW }, // !FIX !TODO need to code this
     { "Quake", 95, QUAKE }
 };
 

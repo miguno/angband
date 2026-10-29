@@ -21,6 +21,7 @@
 
 #ifdef ALLOW_BORG
 
+#include "borg.h"
 #include "borg-cave-view.h"
 #include "borg-flow-kill.h"
 #include "borg-inventory.h"
@@ -74,9 +75,9 @@ static int borg_perma_aux_bless(void)
     int fail_allowed = 15, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 20;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 25;
 
     /* already blessed */
@@ -97,7 +98,7 @@ static int borg_perma_aux_bless(void)
 
     /* If its cheap, go ahead */
     if (borg.trait[BI_CLEVEL] > 10
-        && cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+        && cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                       : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -122,9 +123,9 @@ static int borg_perma_aux_resist(void)
     int fail_allowed = 5;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     if (borg.temp.res_fire + borg.temp.res_acid + borg.temp.res_elec
@@ -139,7 +140,7 @@ static int borg_perma_aux_resist(void)
     cost = borg_get_spell_power(RESISTANCE);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -166,7 +167,7 @@ static int borg_perma_aux_resist_colluin(void)
         return 0;
 
     /* Only use it when Unique is close */
-    if (!borg_fighting_unique)
+    if (!borg.near.unique)
         return 0;
 
     if (!borg_equips_item(act_resist_all, true)
@@ -195,12 +196,12 @@ static int borg_perma_aux_resist_p(void)
     int fail_allowed = 5;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
-    if (borg.temp.res_pois || !unique_on_level)
+    if (borg.temp.res_pois || !borg.mon.unique)
         return 0;
 
     if (!borg_spell_okay_fail(RESIST_POISON, fail_allowed))
@@ -239,9 +240,9 @@ static int borg_perma_aux_speed(void)
     int cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already fast */
@@ -256,7 +257,7 @@ static int borg_perma_aux_speed(void)
     cost = borg_get_spell_power(HASTE_SELF);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -288,9 +289,9 @@ static int borg_perma_aux_prot_evil(void)
         return 0;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     if (!borg_spell_okay_fail(PROTECTION_FROM_EVIL, fail_allowed))
@@ -300,7 +301,7 @@ static int borg_perma_aux_prot_evil(void)
     cost = borg_get_spell_power(PROTECTION_FROM_EVIL);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -329,9 +330,9 @@ static int borg_perma_aux_fastcast(void)
     int fail_allowed = 5, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already fast */
@@ -349,7 +350,7 @@ static int borg_perma_aux_fastcast(void)
     cost = borg_get_spell_power(MANA_CHANNEL);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -376,9 +377,9 @@ static int borg_perma_aux_hero(void)
     int fail_allowed = 5, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already heroism */
@@ -402,7 +403,7 @@ static int borg_perma_aux_hero(void)
     cost = borg_get_spell_power(HEROISM);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -429,9 +430,9 @@ static int borg_perma_aux_regen(void)
     int fail_allowed = 5, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already regenerating */
@@ -454,7 +455,7 @@ static int borg_perma_aux_regen(void)
     cost = borg_get_spell_power(RAPID_REGENERATION);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -476,9 +477,9 @@ static int borg_perma_aux_smite_evil(void)
     int fail_allowed = 5, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already smiting */
@@ -496,7 +497,7 @@ static int borg_perma_aux_smite_evil(void)
     cost = borg_get_spell_power(SMITE_EVIL);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -523,9 +524,9 @@ static int borg_perma_aux_venom(void)
     int fail_allowed = 5, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already smiting */
@@ -543,7 +544,7 @@ static int borg_perma_aux_venom(void)
     cost = borg_get_spell_power(SMITE_EVIL);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -570,9 +571,9 @@ static int borg_perma_aux_berserk(void)
     int fail_allowed = 5, cost;
 
     /* increase the threshold */
-    if (unique_on_level)
+    if (borg.mon.unique)
         fail_allowed = 10;
-    if (borg_fighting_unique)
+    if (borg.near.unique)
         fail_allowed = 15;
 
     /* already blessed */
@@ -590,7 +591,7 @@ static int borg_perma_aux_berserk(void)
     cost = borg_get_spell_power(BERSERK_STRENGTH);
 
     /* If its cheap, go ahead */
-    if (cost >= ((unique_on_level) ? borg.trait[BI_CURSP] / 7
+    if (cost >= ((borg.mon.unique) ? borg.trait[BI_CURSP] / 7
                                    : borg.trait[BI_CURSP] / 10))
         return 0;
 
@@ -616,7 +617,7 @@ static int borg_perma_aux_berserk_potion(void)
 {
 
     /* Saver the potions */
-    if (!borg_fighting_unique)
+    if (!borg.near.unique)
         return 0;
 
     /* already blessed */

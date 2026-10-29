@@ -114,24 +114,6 @@ extern struct borg_track track_door;
  */
 extern struct borg_track track_closed;
 
-extern bool borg_desperate;
-extern bool vault_on_level;
-
-/*
- * Anti-Summon
- */
-extern int  borg_t_antisummon;
-extern bool borg_as_position;
-extern bool borg_digging;
-extern bool my_need_alter;
-extern bool my_no_alter;
-extern bool my_need_redraw;
-
-/*
- * Current danger thresh-hold
- */
-extern int16_t avoidance;
-
 /*
  * Search grids
  */

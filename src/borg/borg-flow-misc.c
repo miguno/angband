@@ -40,6 +40,7 @@
 #include "borg-item-val.h"
 #include "borg-magic.h"
 #include "borg-projection.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg-update.h"
 #include "borg.h"
@@ -71,9 +72,9 @@ void borg_flow_reverse(int depth, bool optimize, bool avoid, bool tunneling,
     borg_flow_spread(depth, optimize, avoid, tunneling, stair_idx, sneak);
 }
 
-/* 
+/*
  * Get the borgs "leash"
- * This is the distance from the stairs the borg can explore before 
+ * This is the distance from the stairs the borg can explore before
  * returning to the stairs and trying to explore in anohter direction.
  * The leash is different for exploring vs trying to get something.
  */
@@ -135,7 +136,7 @@ bool borg_happy_grid_bold(int y, int x)
         return false;
 
     /* Apply a control effect so that he does not get stuck in a loop */
-    if ((borg_t - borg_began) >= 2000)
+    if (borg_timer(borg.time.level) >= 2000)
         return false;
 
     /* Case 1a: north-south corridor */
@@ -232,7 +233,7 @@ bool borg_flow_recover(int dist)
     int i, x, y;
 
     /* Sometimes we loop on this */
-    if (borg.time_this_panel > 500)
+    if (borg.antibounce_count > 500)
         return false;
 
     /* No retreating and recovering when low level */
@@ -486,7 +487,7 @@ bool borg_flow_spastic(bool bored)
         return false;
 
     /* Not if hopeless unless twitchy */
-    if (borg_t - borg_began > 3000 && avoidance <= borg.trait[BI_CURHP])
+    if (borg_timer(borg.time.level) > 3000 && borg.avoidance <= borg.trait[BI_CURHP])
         return false;
 
     /* Not bored */
@@ -495,7 +496,7 @@ bool borg_flow_spastic(bool bored)
         int p = borg_danger(borg.c.y, borg.c.x, 1, true, false);
 
         /* Avoid searching when in danger */
-        if (p > avoidance / 4)
+        if (p > borg.avoidance / 4)
             return false;
     }
 
@@ -606,7 +607,7 @@ bool borg_flow_spastic(bool bored)
 
             /* Skip ones that make me wander too far unless twitchy (Leash)*/
             if (b_stair != -1 && borg.trait[BI_CLEVEL] < 15
-                && avoidance <= borg.trait[BI_CURHP]) {
+                && borg.avoidance <= borg.trait[BI_CURHP]) {
                 /* Check the distance of this grid to the stair */
                 j = borg_distance(
                     track_less.y[b_stair], track_less.x[b_stair], y, x);
@@ -707,7 +708,7 @@ bool borg_flow_spastic(bool bored)
             /* Tweak -- Reward walls, punish visitation, distance, time on level
              */
             v = (supp * 500) + (diag * 100) - (ag->xtra * 40) - (cost * 2)
-                - (borg_t - borg_began);
+                - borg_timer(borg.time.level);
 
             /* Punish low level and searching too much */
             v -= (50 - borg.trait[BI_CLEVEL]) * 5;
@@ -888,7 +889,7 @@ bool borg_flow_vault(int nearness)
     i           = 0;
 
     /* no need if no vault on level */
-    if (!vault_on_level)
+    if (!borg.status.vault)
         return false;
 
     /* no need if we can't dig at least quartz */
@@ -909,9 +910,9 @@ bool borg_flow_vault(int nearness)
 
             /* only deal with excavatable walls */
             if (feat != FEAT_RUBBLE
-                && feat != FEAT_QUARTZ 
+                && feat != FEAT_QUARTZ
                 && feat != FEAT_MAGMA
-                && feat != FEAT_QUARTZ_K 
+                && feat != FEAT_QUARTZ_K
                 && feat != FEAT_MAGMA_K) {
                 /* only deal with granite if we are good diggers */
                 if (!can_dig_hard || feat != FEAT_GRANITE)
@@ -1223,8 +1224,8 @@ bool borg_check_rest(int y, int x)
     /* Do not rest recently after killing a multiplier */
     /* This will avoid the problem of resting next to */
     /* an unkown area full of breeders */
-    if (borg.when_last_kill_mult > (borg_t - 4)
-        && borg.when_last_kill_mult <= borg_t)
+    if (borg_timer(borg.time.last_kill_mult) < 4
+        && borg_timer(borg.time.last_kill_mult) > 0)
         return false;
 
     /* No resting if Blessed and good HP and good SP */
@@ -1237,10 +1238,10 @@ bool borg_check_rest(int y, int x)
         return false;
 
     /* Set this to Zero */
-    borg.when_last_kill_mult = 0;
+    borg.time.last_kill_mult = 0;
 
     /* Most of the time, its ok to rest in a vault */
-    if (vault_on_level) {
+    if (borg.status.vault) {
         for (i = -1; i < 1; i++) {
             for (ii = -1; ii < 1; ii++) {
                 /* check bounds */
@@ -1336,11 +1337,11 @@ bool borg_check_rest(int y, int x)
         /* Ignore proximity checks while inside a vault */
         if (!borg_in_vault) {
             /* Real scary guys pretty close */
-            if (d < 5 && (p > avoidance / 3) && !borg.munchkin_mode)
+            if (d < 5 && (p > borg.avoidance / 3) && !borg.munchkin_mode)
                 return false;
 
             /* scary guys far away */
-            /*if (d < 17 && d > 5 && (p > avoidance/3)) return false; */
+            /*if (d < 17 && d > 5 && (p > borg.avoidance/3)) return false; */
         }
 
         /* should check LOS... monster to me concerned for Ranged Attacks */
@@ -1399,10 +1400,14 @@ void borg_free_flow_misc(void)
 {
     borg_free_track(&track_vein);
 
-    mem_free(track_shop_y);
-    track_shop_y = NULL;
-    mem_free(track_shop_x);
-    track_shop_x = NULL;
+    if (track_shop_y) {
+        mem_free(track_shop_y);
+        track_shop_y = NULL;
+    }
+    if (track_shop_x) {
+        mem_free(track_shop_x);
+        track_shop_x = NULL;
+    }
 }
 
 #endif

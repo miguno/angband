@@ -23,7 +23,7 @@
 #include "ui-signals.h"
 #include "ui-term.h"
 
-int16_t signal_count;	/* Count interrupts ("I'm going to count to five") */
+volatile sig_atomic_t signal_count;	/* Count interrupts ("I'm going to count to five") */
 
 #ifndef WINDOWS
 
@@ -185,7 +185,7 @@ static void handle_signal_simple(int sig)
 		Term_xtra(TERM_XTRA_NOISE, 0);
 
 		/* Clear the top line */
-		Term_erase(0, 0, 255);
+		Term_erase(0, 0, Term->wid);
 
 		/* Display the cause */
 #ifdef SETGID
@@ -239,7 +239,7 @@ static void handle_signal_abort(int sig)
 	}
 
 	/* Clear the bottom line */
-	Term_erase(0, 23, 255);
+	Term_erase(0, 23, Term->wid);
 
 	/* Give a warning */
 	Term_putstr(0, 23, -1, COLOUR_RED,

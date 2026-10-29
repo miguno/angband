@@ -27,7 +27,6 @@
 #include "init.h"
 #include "mon-lore.h"
 #include "mon-make.h"
-#include "obj-knowledge.h"
 #include "obj-util.h"
 #include "player-attack.h"
 #include "player-calcs.h"
@@ -138,7 +137,7 @@ struct cmd_info cmd_item[] =
  */
 struct cmd_info cmd_action[] =
 {
-	{ "Disarm a trap or chest", { 'D' }, CMD_DISARM, NULL, NULL, 0, NULL, NULL, NULL, 0 },
+	{ "Disarm a trap/chest; lock door", { 'D' }, CMD_DISARM, NULL, NULL, 0, NULL, NULL, NULL, 0 },
 	{ "Rest for a while", { 'R' }, CMD_NULL, textui_cmd_rest, NULL, 0, NULL, NULL, NULL, 0 },
 	{ "Look around", { 'l', 'x' }, CMD_NULL, do_cmd_look, NULL, 0, NULL, NULL, NULL, 0 },
 	{ "Target monster or location", { '*' }, CMD_NULL, textui_target, NULL, 0, NULL, NULL, NULL, 0 },
@@ -738,12 +737,6 @@ static bool start_game(bool new_game)
 	if (player->is_dead || new_game) {
 		character_generated = false;
 		textui_do_birth();
-	} else {
-		/*
-		 * Bring the stock curse objects up-to-date with what the
-		 * player knows.
-		 */
-		update_player_object_knowledge(player);
 	}
 
 	/* Tell the UI we've started. */
@@ -1088,7 +1081,7 @@ bool save_game_checked(void)
 
 	/* Save monster memory to user directory */
 	if (!lore_save("lore.txt")) {
-		msg("lore save failed!");
+		msg("Lore save failed!");
 		event_signal(EVENT_MESSAGE_FLUSH);
 	}
 
@@ -1152,7 +1145,7 @@ void close_game(bool prompt_failed_save)
 			if (!prompt_failed_save || terms_disconnecting
 					|| !get_check("Saving failed.  Try again? ")) {
 				prompting = false;
-				msg("death save failed!");
+				msg("Death save failed!");
 				event_signal(EVENT_MESSAGE_FLUSH);
 			}
 		}

@@ -510,7 +510,7 @@ spell:Confuse Monster:5:3:30:5
 effect:BOLT_AWARE:MON_CONF
 dice:5+d$S
 expr:S:PLAYER_LEVEL:- 5
-desc:Confuse a single monster; more effective against animals.
+desc:Confuses a single monster; more effective against animals.
 
 spell:Slow Monster:6:4:30:5
 effect:BOLT_STATUS:MON_SLOW
@@ -624,8 +624,8 @@ desc:Restores all stats and experience points to maximum.
 spell:Rapid Regeneration:37:20:90:100
 effect:TIMED_INC:HEAL
 dice:5+1d3
-desc:Speed up digestion to increase regeneration of hitpoints for
-desc: the next 5+1d3 turns (or until hungry).
+desc:Speeds up digestion to increase regeneration of hitpoints for the next
+desc: 5+1d3 turns (or until hungry).
 
 spell:Herbal Curing:40:20:90:100
 effect:CURE:CUT
@@ -1042,16 +1042,16 @@ expr:B:PLAYER_LEVEL:* 4
 effect:DAMAGE
 dice:d$S
 expr:S:PLAYER_LEVEL:* 2
-desc:Instantly kill any monster in line-of-sight with less than four times the
-desc: player's level in hitpoints, also hurting the player.  Other monsters are
-desc: unharmed.
+desc:Instantly kills any monster in line of sight with less than four times
+desc: the player's level in hitpoints, also hurting the player.  Other
+desc: monsters are unharmed.
 
 spell:Sleep Evil:12:5:50:5
 effect:PROJECT_LOS:SLEEP_EVIL
 dice:$B
 expr:B:PLAYER_LEVEL:* 10 + 500
 desc:Attempts to put to sleep each evil monster within line of sight.
-desc:  Monsters that resist confusion are not affected.
+desc:  Monsters that resist sleep are not affected.
 
 spell:Shadow Shift:15:10:50:10
 effect:TELEPORT
@@ -1189,7 +1189,7 @@ effect:JUMP_AND_BITE
 dice:$B
 expr:B:PLAYER_LEVEL:+ 0
 desc:Allows you to assume the form of a vampire at the cost of half your
-desc: current hitpoints, than teleports you to the nearest living monster
+desc: current hitpoints, then teleports you to the nearest living monster
 desc: and drains a level-dependent number of hitpoints, healing and nourishing
 desc: you.  When first transformed you will temporarily be able
 desc: to take hitpoints from living monsters with your bite attack.
@@ -1664,7 +1664,7 @@ spell:Leap into Battle:10:5:30:10
 effect:MOVE_ATTACK
 dice:$B
 expr:B:PLAYER_LEVEL:+ 5 / 15
-desc:You run up to 4 spaces towards targeted enemy, then perform a
+desc:You run up to 4 spaces towards the targeted enemy, then perform a
 desc: melee blow.  You gain an additional blow at levels 25 and 40.  If you
 desc: moved, the number of blows is reduced by 25% for each space, then rounded.
 
@@ -1674,8 +1674,8 @@ dice:12+d12
 effect:TIMED_INC:OPP_CONF
 effect:TIMED_INC:FREE_ACT
 effect:CLEAR_VALUE
-desc:Your mind becomes too focused to be slowed, paralyzed or confused
-desc: for 12+d12 turns.
+desc:Your mind becomes too focused to be slowed, paralyzed or confused for
+desc: 12+1d12 turns.
 
 book:shadow book:town:[Fear and Torment]:5:shadow
 
@@ -1704,7 +1704,7 @@ desc: likely to use a ranged attack (including spells and innate abilities).
 spell:Venom:28:18:35:30
 effect:TIMED_INC:ATT_POIS:0:5
 dice:18+d18
-desc:Coats all your melee weapons with poison for 18+d18 turns.
+desc:Coats all your melee weapons with poison for 18+1d18 turns.
 
 spell:Werewolf Form:32:30:40:100
 effect:SHAPECHANGE:werewolf

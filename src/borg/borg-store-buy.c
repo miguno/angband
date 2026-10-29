@@ -1193,8 +1193,8 @@ bool borg_think_shop_buy(void)
             /* The purchase is complete */
             borg.goal.shop = borg.goal.ware = borg.goal.item = -1;
 
-            /* Increment our clock to avoid loops */
-            borg.time_this_panel++;
+            /* Increment our anti-bounce count to avoid loops */
+            borg.antibounce_count++;
 
             return false;
         }
@@ -1235,8 +1235,8 @@ bool borg_think_shop_buy(void)
         /* The purchase is complete */
         borg.goal.shop = borg.goal.ware = borg.goal.item = -1;
 
-        /* Increment our clock to avoid loops */
-        borg.time_this_panel++;
+        /* Increment our anti-bounce count to avoid loops */
+        borg.antibounce_count++;
 
         /* leave the store */
         borg_keypress(ESCAPE);

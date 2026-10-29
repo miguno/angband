@@ -114,7 +114,7 @@ void do_cmd_go_down(struct command *cmd)
 
 	/* Paranoia, no descent from z_info->max_depth - 1 */
 	if (player->depth == z_info->max_depth - 1) {
-		msg("The dungeon does not appear to extend deeper");
+		msg("The dungeon does not appear to extend deeper.");
 		return;
 	}
 
@@ -1884,7 +1884,7 @@ void do_cmd_mon_command(struct command *cmd)
 
 			/* Don't let immobile monsters be moved */
 			if (rf_has(mon->race->flags, RF_NEVER_MOVE)) {
-				msg("The monster can not move.");
+				msg("The monster cannot move.");
 				return;
 			}
 

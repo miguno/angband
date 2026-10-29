@@ -79,7 +79,10 @@ const char *describe_race_flag(int flag)
 /**
  * Create a mask of monster flags of a specific type.
  *
- * \param f is the flag array we're filling
+ * \param f is the flag array we're filling.  Given the contents of ..., the
+ * result in f is known at compile time:  it only depends on ... and what is
+ * in list-mon-race-flags.h.  So, if used repeatedly, compute the result once
+ * and memorize it for later use.
  * \param ... is the list of flags we're looking for
  *
  * N.B. RFT_MAX must be the last item in the ... list
@@ -95,7 +98,7 @@ void create_mon_flag_mask(bitflag *f, ...)
 	va_start(args, f);
 
 	/* Process each type in the va_args */
-    for (i = va_arg(args, int); i != RFT_MAX; i = va_arg(args, int)) {
+	for (i = va_arg(args, int); i != RFT_MAX; i = va_arg(args, int)) {
 		for (rf = monster_flag_table; rf->index < RF_MAX; rf++)
 			if (rf->type == i)
 				rf_on(f, rf->index);
@@ -419,8 +422,16 @@ void update_mon(struct monster *mon, struct chunk *c, bool full)
 				player->upkeep->redraw |= (PR_HEALTH);
 
 			/* Count "fresh" sightings */
-			if (lore->sights < SHRT_MAX)
+			if (lore->sights < SHRT_MAX) {
 				lore->sights++;
+				/*
+				 * Ensure obvious flags are learned on first
+				 * sighting.
+				 */
+				if (lore->sights == 1) {
+					lore_update(mon->race, lore);
+				}
+			}
 
 			/* Window stuff */
 			player->upkeep->redraw |= PR_MONLIST;
@@ -830,7 +841,7 @@ void update_smart_learn(struct monster *mon, struct player *p, int flag,
 
 	/* Learn the element */
 	if (element_ok)
-		mon->known_pstate.el_info[element].res_level
+		mon->known_pstate.res_level[element]
 			= p->state.el_info[element].res_level;
 }
 
@@ -1471,13 +1482,26 @@ void steal_monster_item(struct monster *mon, int midx)
 
 		/* Try and steal */
 		if (monster_reaction < steal_skill) {
+			/* Success! */
 			int wake = 35 - player->state.skills[SKILL_STEALTH];
 
-			/* Success! */
+			/*
+			 * Track thefts from the monster's own drop without
+			 * wrapping the counter around.  This is sloppy if the
+			 * monster can pick up or steal and is not a unique:
+			 * cannot distinguish this monster's drop and items
+			 * picked up or stolen that are from another monster
+			 * of the same race.
+			 */
+			if (obj->origin_race == mon->race
+					&& lore->thefts < 65535) {
+				lore->thefts++;
+			}
+
 			obj->held_m_idx = 0;
 			pile_excise(&mon->held_obj, obj);
 			if (tval_is_money(obj)) {
-				msg("You steal %d gold pieces worth of treasure.", obj->pval);
+				msg("You steal treasure worth %d gold pieces.", obj->pval);
 				player->au += obj->pval;
 				player->upkeep->redraw |= (PR_GOLD);
 				delist_object(cave, obj);
@@ -1499,9 +1523,6 @@ void steal_monster_item(struct monster *mon, int midx)
 					inven_carry(player, obj, true, true);
 				}
 			}
-
-			/* Track thefts */
-			lore->thefts++;
 
 			/* Monster wakes a little */
 			mon_dec_timed(mon, MON_TMD_SLEEP, wake, MON_TMD_FLG_NOTIFY);
@@ -1589,6 +1610,8 @@ static bool monster_base_shape_okay(struct monster_race *race)
  */
 bool monster_change_shape(struct monster *mon)
 {
+	static bitflag summon_mask[RSF_SIZE];
+	static bool initialize_mask = true;
 	struct monster_shape *shape = mon->race->shapes;
 	struct monster_race *race = NULL;
 
@@ -1623,9 +1646,15 @@ bool monster_change_shape(struct monster *mon)
 		int i, poss = 0, which, index, summon_type;
 		const struct monster_spell *spell;
 
+		if (initialize_mask) {
+			create_mon_spell_mask(summon_mask, RST_SUMMON,
+				RST_NONE);
+			initialize_mask = false;
+		}
+
 		/* Extract the summon spells */
-		create_mon_spell_mask(summon_spells, RST_SUMMON, RST_NONE);
-		rsf_inter(summon_spells, mon->race->spell_flags);
+		rsf_copy(summon_spells, mon->race->spell_flags);
+		rsf_inter(summon_spells, summon_mask);
 
 		/* Count possibilities */
 		for (i = rsf_next(summon_spells, FLAG_START); i != FLAG_END;

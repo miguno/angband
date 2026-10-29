@@ -119,7 +119,7 @@ effect:CURE:POISONED
 effect:CURE:STUN
 effect:CURE:AMNESIA
 effect:CURE:CONFUSED
-desc:heals 35% of max HP (minimum 300HP), cut damage, and cures stunning, poisoning, blindness, and confusion
+desc:heals 35% of lost HP (minimum 300HP), cut damage, and cures stunning, poisoning, blindness, and confusion
 
 name:CURE_FULL2
 aim:0
@@ -683,7 +683,7 @@ aim:0
 level:25
 power:19
 effect:DEEP_DESCENT
-desc:teleports you five levels down
+desc:teleports you up to five levels below your maximum depth
 
 
 name:EARTHQUAKES
@@ -698,7 +698,7 @@ aim:0
 level:57
 power:12
 effect:DESTRUCTION:LIGHT:15
-desc:destroys an area around you in the shape of a circle radius 15, and blinds you for 1d10+10 turns
+desc:destroys an area around you in the shape of a circle of radius 15, and blinds you for 1d10+10 turns
 
 
 name:LOSSLOW
@@ -844,7 +844,7 @@ name:RAGE_BLESS_RESIST
 aim:0
 level:50
 power:21
-msg:{name} glow{s} many colors...
+msg:{name} glow{s} many colours...
 effect:HEAL_HP
 dice:30
 effect:CURE:AFRAID
@@ -1260,7 +1260,7 @@ level:77
 power:20
 effect:RESTORE_STAT:INT
 effect:RESTORE_MANA
-desc:restores both intelligence and manapoints to maximum
+desc:restores both intelligence and mana points to maximum
 
 name:STAFF_HOLY
 aim:0
@@ -1320,7 +1320,8 @@ effect:TIMED_INC:OPP_COLD
 effect:CLEAR_VALUE
 effect:HEAL_HP
 dice:200
-desc:grants temporary resistance to fire and cold, cures 200HP, but also makes you hallucinate wildly
+desc:grants temporary resistance to fire and cold, heals 200HP, but also
+desc: makes you hallucinate wildly
 
 name:SHROOM_TERROR
 aim:0
@@ -1328,7 +1329,7 @@ level:10
 power:5
 effect:TIMED_SET:TERROR
 dice:79+1d41
-desc:speeds up you temporarily but also makes you mortally afraid
+desc:speeds you up temporarily but also makes you mortally afraid
 
 name:SHROOM_STONE
 aim:0

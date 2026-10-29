@@ -26,7 +26,7 @@
 #include "borg-home-notice.h"
 #include "borg-item-val.h"
 #include "borg-magic.h"
-#include "borg-trait-swap.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -659,7 +659,7 @@ const char *borg_prepared(int depth)
 
         /* is only Morgoth alive? */
         if (borg_numb_live_unique < 1
-            || borg_first_living_unique == borg_morgoth_id)
+            || borg_first_living_unique == borg.id.morgoth)
         {
             if (depth >= 99)
                 borg.ready_morgoth = 1;
@@ -818,7 +818,7 @@ const char *borg_restock(int depth)
 
     /* Must have "Heal" */
     /* If I just got to dlevel 100 and low on heals, get out now. */
-    if (borg_t - borg_began < 10 && borg.trait[BI_AEZHEAL] < 15)
+    if (borg_timer(borg.time.level) < 10 && borg.trait[BI_AEZHEAL] < 15)
         return ("restock *heal*");
 
     /* Assume happy */
@@ -832,7 +832,7 @@ extern const char *borg_must_return_to_town(void)
         return ((char *)NULL);
 
     /* Always spend time on a level unless 100*/
-    if (borg_t - borg_began < 100 && borg.trait[BI_CDEPTH] != 100)
+    if (borg_timer(borg.time.level) < 100 && borg.trait[BI_CDEPTH] != 100)
         return ((char *)NULL);
 
     /* need to return to town if restock is needed */

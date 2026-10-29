@@ -25,6 +25,7 @@
 
 #ifdef ALLOW_BORG
 
+#include "borg.h"
 #include "borg-flow.h"
 
 /*
@@ -33,13 +34,13 @@
 typedef struct borg_take borg_take;
 
 struct borg_take {
-    struct object_kind *kind; /* Kind */
+    uint32_t            kidx;
     bool                known; /* Verified kind */
     bool                seen; /* Assigned motion */
     bool                extra; /* Unused */
     bool                orbed; /* Orb of Draining cast on it */
     uint8_t             x, y; /* Location */
-    int16_t             when; /* When last seen */
+    borg_time           when; /* When last seen */
     int                 value; /* Estimated value of item */
     int                 tval; /* Known tval */
 };

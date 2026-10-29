@@ -39,6 +39,7 @@
 #include "borg-magic.h"
 #include "borg-prepared.h"
 #include "borg-store.h"
+#include "borg-think-dungeon-util.h"
 #include "borg.h"
 
 /*
@@ -138,7 +139,7 @@ static char borg_index_to_label(int i)
  * Write a file with the current dungeon info (Borg)
  * and his equipment, inventory and home (Player)
  * and his swap armor, weapon (Borg)
- * NOTE: this uses internal game data.  This is okay since we are just dumping 
+ * NOTE: this uses internal game data.  This is okay since we are just dumping
  * the information rather than using it.
  */
 void borg_write_map(bool ask)
@@ -231,8 +232,8 @@ void borg_write_map(bool ask)
             /* Known Items */
             if (ag->take) {
                 borg_take *take = &borg_takes[ag->take];
-                if (take->kind) {
-                    struct object_kind *k_ptr = take->kind;
+                if (take->kidx) {
+                    struct object_kind *k_ptr = &k_info[take->kidx];
                     ch                        = k_ptr->d_char;
                 }
             }
@@ -443,16 +444,14 @@ void borg_write_map(bool ask)
     file_putf(borg_map_file, "\n\n");
 
     /* Dump the Time Variables */
-    file_putf(borg_map_file, "Time on this panel: %d\n", borg.time_this_panel);
+    file_putf(borg_map_file, "Anti-bounce counter: %d\n", borg.antibounce_count);
     file_putf(borg_map_file, "Time on this level: %ld\n",
-        (long int)(borg_t - borg_began));
+        (long int)(borg_timer(borg.time.level)));
     file_putf(borg_map_file, "Time since left town: %ld\n",
-        (long int)(borg_time_town + (borg_t - borg_began)));
-    file_putf(borg_map_file, "Food in town: %d\n", borg_food_onsale);
-    file_putf(borg_map_file, "Fuel in town: %d\n", borg_fuel_onsale);
+        (long int)(borg_timer(borg.time.town)));
     file_putf(borg_map_file, "Borg_no_retreat: %d\n", borg.no_retreat);
-    file_putf(borg_map_file, "Breeder_level: %d\n", breeder_level);
-    file_putf(borg_map_file, "Unique_on_level: %d\n", unique_on_level);
+    file_putf(borg_map_file, "borg.near.breeder: %d\n", borg.near.breeder);
+    file_putf(borg_map_file, "borg.mon.unique: %d\n", borg.mon.unique);
     if ((turn % (10L * z_info->day_length)) < ((10L * z_info->day_length) / 2))
         file_putf(borg_map_file, "It is daytime in town.\n");
     else
@@ -773,7 +772,7 @@ void borg_display_item(struct object *item2, int n)
 
 /* Function for displaying the status of various info */
 /* Display what the borg is thinking */
-void borg_status(void)
+void borg_display_status(void)
 {
     int j;
 
@@ -1090,15 +1089,15 @@ void borg_status(void)
 
             Term_putstr(54, 11, -1, COLOUR_SLATE, "This Level         ");
             Term_putstr(65, 11, -1, COLOUR_WHITE,
-                format("%ld", (long int)(borg_t - borg_began)));
+                format("%ld", (long int)(borg_timer(borg.time.level))));
 
             Term_putstr(54, 12, -1, COLOUR_SLATE, "Since Town         ");
             Term_putstr(65, 12, -1, COLOUR_WHITE,
-                format("%ld", (long int)(borg_time_town + (borg_t - borg_began))));
+                format("%ld", (long int)(borg_timer(borg.time.town))));
 
-            Term_putstr(54, 13, -1, COLOUR_SLATE, "This Panel         ");
+            Term_putstr(54, 13, -1, COLOUR_SLATE, "Anti-bounce count  ");
             Term_putstr(
-                65, 13, -1, COLOUR_WHITE, format("%d", borg.time_this_panel));
+                65, 13, -1, COLOUR_WHITE, format("%d", borg.antibounce_count));
 
             /* Sustains */
             Term_putstr(19, 0, -1, COLOUR_WHITE, "Sustains");
@@ -1187,37 +1186,37 @@ void borg_status(void)
             /* Temporary effects */
             Term_putstr(42, 0, -1, COLOUR_WHITE, "Level Information");
 
-            if (vault_on_level)
+            if (borg.status.vault)
                 attr = COLOUR_WHITE;
             else
                 attr = COLOUR_SLATE;
             Term_putstr(42, 1, -1, attr, "Vault on level");
 
-            if (unique_on_level)
+            if (borg.mon.unique)
                 attr = COLOUR_WHITE;
             else
                 attr = COLOUR_SLATE;
             Term_putstr(42, 2, -1, attr, "Unique on level");
-            if (unique_on_level)
+            if (borg.mon.unique)
                 Term_putstr(58, 2, -1, attr,
-                    format("(%s)", r_info[unique_on_level].name));
+                    format("(%s)", r_info[borg.mon.unique].name));
             else
                 Term_putstr(58, 2, -1, attr,
                     "                                                ");
 
-            if (scaryguy_on_level)
+            if (borg.mon.scary)
                 attr = COLOUR_WHITE;
             else
                 attr = COLOUR_SLATE;
             Term_putstr(42, 3, -1, attr, "Scary Guy on level");
 
-            if (breeder_level)
+            if (borg.near.breeder)
                 attr = COLOUR_WHITE;
             else
                 attr = COLOUR_SLATE;
             Term_putstr(42, 4, -1, attr, "Breeder level (closing doors)");
 
-            if (borg_kills_summoner != -1)
+            if (borg.near.summoner_idx != -1)
                 attr = COLOUR_WHITE;
             else
                 attr = COLOUR_SLATE;
@@ -1271,15 +1270,15 @@ void borg_status(void)
                 attr = COLOUR_WHITE;
                 Term_putstr(11, 19, -1, attr, format("%d   ", num_mana));
 
-                if (morgoth_on_level)
+                if (borg.near.morgoth)
                     attr = COLOUR_BLUE;
                 else
                     attr = COLOUR_SLATE;
                 Term_putstr(1, 20, -1, attr,
-                    format("Morgoth on Level.  Last seen:%d       ",
-                        borg_t - borg_t_morgoth));
+                    format("Morgoth on Level.  Last seen:%ld       ",
+                        (long int)borg_timer(borg.time.morgoth)));
 
-                if (borg_morgoth_position)
+                if (borg.morgoth_position)
                     attr = COLOUR_BLUE;
                 else
                     attr = COLOUR_SLATE;

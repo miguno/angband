@@ -21,9 +21,9 @@
 
 #ifdef ALLOW_BORG
 
-#include "../obj-util.h"
 #include "../ui-menu.h"
 
+#include "borg.h"
 #include "borg-io.h"
 #include "borg-item-analyze.h"
 #include "borg-item.h"

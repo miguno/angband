@@ -24,8 +24,8 @@
 #include "../ui-menu.h"
 
 #include "borg-danger.h"
-#include "borg-flow-kill.h"
 #include "borg-flow-misc.h"
+#include "borg-init.h"
 #include "borg-inventory.h"
 #include "borg-io.h"
 #include "borg-item-analyze.h"
@@ -34,9 +34,9 @@
 #include "borg-item-val.h"
 #include "borg-magic.h"
 #include "borg-power.h"
-#include "borg-store-sell.h"
 #include "borg-store.h"
 #include "borg-think.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -273,7 +273,7 @@ bool borg_swap_rings(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg_t - borg_began > 1000)
+    if (borg_timer(borg.time.level) > 1000)
         return false;
     if (borg.trait[BI_CDEPTH] != 0)
         return false;
@@ -427,7 +427,7 @@ bool borg_wear_rings(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg_t - borg_began > 2000)
+    if (borg_timer(borg.time.level) > 2000)
         return false;
 
     /* Scan inventory */
@@ -511,7 +511,7 @@ bool borg_wear_rings(void)
         borg_keypress(all_letters_nohjkl[b_i]);
 
         /* Did something */
-        borg.time_this_panel++;
+        borg.antibounce_count++;
         return true;
     }
 
@@ -556,7 +556,7 @@ bool borg_backup_swap(int p)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg.time_this_panel > 300)
+    if (borg.antibounce_count > 300)
         return false;
 
     /* make sure we have an appropriate swap */
@@ -710,8 +710,8 @@ bool borg_backup_swap(int p)
 
     /* good swap.  Make sure it helps a significant amount */
     if (p > b_p
-        && b_p <= (borg_fighting_unique ? ((avoidance * 2) / 3)
-                                        : (avoidance / 2))) {
+        && b_p <= (borg.near.unique ? ((borg.avoidance * 2) / 3)
+                                        : (borg.avoidance / 2))) {
         /* Log */
         borg_note(format("# Swapping backup.  (%ld < %d).", (long int)b_p, p));
 
@@ -777,9 +777,9 @@ bool borg_wear_stuff(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg_t - borg_began > 2000)
+    if (borg_timer(borg.time.level) > 2000)
         return false;
-    if (borg.time_this_panel > 1300)
+    if (borg.antibounce_count > 1300)
         return false;
 
     /* Scan inventory */
@@ -811,7 +811,7 @@ bool borg_wear_stuff(void)
         for (o = 0; o < track_worn_num; o++) {
             /* Examine the worn list */
             if (track_worn_num >= 1 && track_worn_name1[o] == item->art_idx
-                && track_worn_time > borg_t - 10) {
+                && borg_timer(track_worn_time) > 10) {
                 /* Recently worn item */
                 recently_worn = true;
             }
@@ -1010,7 +1010,7 @@ bool borg_wear_stuff(void)
             borg_keypress(all_letters_nohjkl[b_ii - INVEN_WIELD]);
 
             /* Did something */
-            borg.time_this_panel++;
+            borg.antibounce_count++;
             return true;
         }
 
@@ -1020,13 +1020,13 @@ bool borg_wear_stuff(void)
         /* Wear it */
         borg_keypress('w');
         borg_keypress(all_letters_nohjkl[b_i]);
-        borg.time_this_panel++;
+        borg.antibounce_count++;
 
         /* Track the newly worn artifact item to avoid loops */
         if (item->art_idx && (track_worn_num < track_worn_size)) {
             borg_note("# Noting the wearing of artifact.");
             track_worn_name1[track_worn_num] = item->art_idx;
-            track_worn_time                  = borg_t;
+            track_worn_time                  = borg.time.now;
             track_worn_num++;
         }
         return true;
@@ -1067,7 +1067,7 @@ static uint16_t borg_best_stuff_order(int n)
     case 11:
         return INVEN_NECK;
     default:
-        return 255;
+        return UINT16_MAX;
     }
 }
 
@@ -1094,6 +1094,12 @@ static bool borg_one_step_wearing_best(int skip)
             if (skipping) {
                 item_num++;
                 skipping--;
+
+                /* skipping the last item means we need to make room */
+                /* before continuing */
+                if (item_num >= z_info->equip_slots_max)
+                    return false;
+
                 continue;
             }
 
@@ -1204,17 +1210,16 @@ static bool borg_one_step_wearing_best(int skip)
  * Helper function (see below)
  */
 static void borg_best_stuff_aux(
-    int n, uint8_t *test, uint8_t *best, int32_t *vp)
+    int n, uint16_t *test, uint16_t *best, int32_t *vp)
 {
-    int i;
-
-    int slot;
+    uint16_t i;
+    int      slot;
 
     /* Extract the slot */
     slot = borg_best_stuff_order(n);
 
     /* All done */
-    if (slot == 255) {
+    if (slot == UINT16_MAX) {
         int32_t p;
 
         /* Examine */
@@ -1244,10 +1249,7 @@ static void borg_best_stuff_aux(
     borg_best_stuff_aux(n + 1, test, best, vp);
 
     /* Try other possible object combination */
-    for (i = 0; i < ((shop_num == BORG_HOME)
-                         ? (z_info->pack_size + z_info->store_inven_max)
-                         : z_info->pack_size);
-         i++) {
+    for (i = 0; i < (z_info->pack_size + z_info->store_inven_max); i++) {
         borg_item *item;
         if (i < z_info->pack_size)
             item = &borg_items[i];
@@ -1324,7 +1326,7 @@ static void borg_best_stuff_aux(
  * single changes such as switch sword of flames for sword of
  * electricity.  This allows multiple changes to get the most
  * powerful set of items, out of everything worn, in equipment
- * and in the home.  
+ * and in the home.
  */
 bool borg_best_stuff(void)
 {
@@ -1332,10 +1334,10 @@ bool borg_best_stuff(void)
 
     int32_t value;
 
-    int i;
+    uint16_t i;
 
-    uint8_t *test;
-    uint8_t *best;
+    uint16_t *test;
+    uint16_t *best;
 
     /* only do this at home */
     if (shop_num != BORG_HOME)
@@ -1353,12 +1355,12 @@ bool borg_best_stuff(void)
     if (!borg.goal.do_best)
         return false;
 
-    best = mem_alloc(sizeof(uint8_t) * z_info->equip_slots_max);
-    test = mem_alloc(sizeof(uint8_t) * z_info->equip_slots_max);
+    best = mem_alloc(sizeof(uint16_t) * z_info->equip_slots_max);
+    test = mem_alloc(sizeof(uint16_t) * z_info->equip_slots_max);
     /* Initialize */
     for (k = 0; k < z_info->equip_slots_max; k++) {
         /* Initialize */
-        best[k] = test[k] = 255;
+        best[k] = test[k] = UINT16_MAX;
     }
 
     /* Evaluate the inventory */
@@ -1382,7 +1384,7 @@ bool borg_best_stuff(void)
         i = best[k];
 
         /* Ignore non-changes */
-        if (i == borg_best_stuff_order(k) || 255 == i)
+        if (i == borg_best_stuff_order(k) || UINT16_MAX == i)
             continue;
 
         found = true;
@@ -1409,7 +1411,7 @@ bool borg_best_stuff(void)
     if (borg_cfg[BORG_VERBOSE]) {
         if (found) {
             for (i = 0; i < z_info->equip_slots_max; i++) {
-                if (best[i] > 100) {
+                if (best[i] >= 100) {
                     borg_note(format("new best: %s",
                         borg_shops[BORG_HOME].ware[best[i] - 100].desc));
                 } else {
@@ -1429,7 +1431,7 @@ bool borg_best_stuff(void)
 }
 
 /*
- * Clear out the "best" swap list and trigger to do another 
+ * Clear out the "best" swap list and trigger to do another
  */
 void borg_clear_best(void)
 {
@@ -1474,7 +1476,7 @@ bool borg_wear_recharge(void)
 
         /* Where can it be worn? */
         slot = borg_wield_slot(item);
-        
+
         /* if this is a rod, only count it if it is a rod of recall */
         /* and we are in town.  This is to prevent walking down when */
         /* the borg has a perfectly serviceable rod */
@@ -1552,17 +1554,26 @@ bool borg_is_ammo(int tval)
 
 void borg_init_item_wear(void)
 {
+    borg_free_item_wear();
+
     /* Track the worn items to avoid loops */
     track_worn_num   = 0;
     track_worn_size  = 10;
     track_worn_time  = 0;
     track_worn_name1 = mem_zalloc(track_worn_size * sizeof(uint8_t));
+
+    if (z_info->equip_slots_max + z_info->pack_size >= 100) {
+        msg("pack size plus equipment slots exceeds 100.  Need a rewrite of best_item code");
+        borg_init_failure = true;
+    }
 }
 
 void borg_free_item_wear(void)
 {
-    mem_free(track_worn_name1);
-    track_worn_name1 = NULL;
+    if (track_worn_name1) {
+        mem_free(track_worn_name1);
+        track_worn_name1 = NULL;
+    }
 }
 
 #endif

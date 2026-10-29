@@ -29,6 +29,7 @@
 #include "borg-item-use.h"
 #include "borg-item-val.h"
 #include "borg-magic.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -583,8 +584,8 @@ bool borg_enchanting(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and finish the job later */
-    if ((borg_t - borg_began > 5500 && borg.trait[BI_CDEPTH] >= 1)
-        || (borg_t - borg_began > 3501 && borg.trait[BI_CDEPTH] == 0))
+    if ((borg_timer(borg.time.level) > 5500 && borg.trait[BI_CDEPTH] >= 1)
+        || (borg_timer(borg.time.level) > 3501 && borg.trait[BI_CDEPTH] == 0))
         return false;
 
     /* Remove Curses */

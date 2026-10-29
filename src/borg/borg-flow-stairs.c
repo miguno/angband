@@ -21,6 +21,7 @@
 
 #ifdef ALLOW_BORG
 
+#include "borg.h"
 #include "borg-flow-kill.h"
 #include "borg-flow.h"
 #include "borg-io.h"
@@ -81,8 +82,8 @@ bool borg_flow_stair_both(int why, bool sneak)
         return false;
 
     /* don't go down if hungry or low on food, unless fleeing a scary town */
-    if (!borg.goal.fleeing && !scaryguy_on_level && !track_less.num
-        && (avoidance <= borg.trait[BI_CURHP] * 15 / 10)
+    if (!borg.goal.fleeing && !borg.mon.scary && !track_less.num
+        && (borg.avoidance <= borg.trait[BI_CURHP] * 15 / 10)
         && (borg.trait[BI_ISWEAK] || borg.trait[BI_ISHUNGRY]
             || borg.trait[BI_FOOD] < 2))
         return false;
@@ -163,7 +164,7 @@ bool borg_flow_stair_less(int why, bool sneak)
         borg_flow_spread(250, true, false, false, -1, sneak);
     } else {
         /* Spread the flow, No Optimize, Avoid */
-        borg_flow_spread(250, false, !borg_desperate, false, -1, sneak);
+        borg_flow_spread(250, false, !borg.status.desperate, false, -1, sneak);
     }
 
     /* Attempt to Commit the flow */
@@ -197,7 +198,7 @@ bool borg_flow_stair_more(int why, bool sneak, bool brave)
             return false;
 
         /* dont go down if hungry or low on food, unless fleeing a scary town */
-        if (!brave && borg.trait[BI_CDEPTH] && !scaryguy_on_level
+        if (!brave && borg.trait[BI_CDEPTH] && !borg.mon.scary
             && (borg.trait[BI_ISWEAK] || borg.trait[BI_ISHUNGRY]
                 || borg.trait[BI_FOOD] < 2))
             return false;

@@ -28,7 +28,7 @@
 #include "borg-flow-kill.h"
 #include "borg-flow.h"
 #include "borg-io.h"
-#include "borg-projection.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -60,7 +60,8 @@ bool borg_munchkin_mage(void)
         return false;
 
     /* Not if too dangerous */
-    if ((borg_danger(borg.c.y, borg.c.x, 1, true, true) > avoidance * 7 / 10)
+    if ((borg_danger(borg.c.y, borg.c.x, 1, true, true)
+            > borg.avoidance * 7 / 10)
         || borg.trait[BI_CURHP] < borg.trait[BI_MAXHP] / 3)
         return false;
     if (borg.trait[BI_ISCONFUSED])
@@ -89,7 +90,7 @@ bool borg_munchkin_mage(void)
             continue;
 
         /* Require current knowledge */
-        if (kill->when < borg_t - 2)
+        if (borg_timer(kill->when) > 2)
             continue;
 
         /* Acquire location */
@@ -107,7 +108,7 @@ bool borg_munchkin_mage(void)
             return false;
 
         /* no attacking most scaryguys, try to get off the level */
-        if (scaryguy_on_level)
+        if (borg.mon.scary)
             return false;
 
         /* Acquire location */
@@ -211,7 +212,8 @@ bool borg_munchkin_melee(void)
         return false;
 
     /* Not if too dangerous */
-    if ((borg_danger(borg.c.y, borg.c.x, 1, true, true) > avoidance * 7 / 10)
+    if ((borg_danger(borg.c.y, borg.c.x, 1, true, true)
+            > borg.avoidance * 7 / 10)
         || borg.trait[BI_CURHP] < borg.trait[BI_MAXHP] / 3)
         return false;
     if (borg.trait[BI_ISCONFUSED])
@@ -236,7 +238,7 @@ bool borg_munchkin_melee(void)
             continue;
 
         /* Require current knowledge */
-        if (kill->when < borg_t - 2)
+        if (borg_timer(kill->when) > 2)
             continue;
 
         /* Not in town.  This should not be reached, but just in case we add it
@@ -245,7 +247,7 @@ bool borg_munchkin_melee(void)
             continue;
 
         /* no attacking most scaryguys, try to get off the level */
-        if (scaryguy_on_level)
+        if (borg.mon.scary)
             return false;
 
         /* Get grid */

@@ -192,8 +192,9 @@ void lore_show_subwindow(const struct monster_race *race,
 
 	/* Erase the window, since textui_textblock_place() only clears what it
 	 * needs */
-	for (y = 0; y < Term->hgt; y++)
-		Term_erase(0, y, 255);
+	for (y = 0; y < Term->hgt; y++) {
+		Term_erase(0, y, Term->wid);
+	}
 
 	tb = textblock_new();
 	lore_description(tb, race, lore, false);

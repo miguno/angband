@@ -21,15 +21,13 @@
 
 #ifdef ALLOW_BORG
 
-#include "borg-cave-view.h"
-
 #include "../cave.h"
 #include "../init.h"
 
+#include "borg.h"
 #include "borg-cave-util.h"
 #include "borg-cave.h"
 #include "borg-projection.h"
-#include "borg-trait.h"
 
 /*
  * Maintain a set of grids marked as "BORG_VIEW"

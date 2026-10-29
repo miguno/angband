@@ -27,6 +27,7 @@
 
 #include "../mon-spell.h"
 
+#include "borg.h"
 #include "borg-flow.h"
 
 /*
@@ -62,7 +63,7 @@ struct borg_kill {
     int16_t      other; /* Estimated something */
     int16_t      level; /* Monsters Level */
     uint32_t     spell_flags[RF_MAX]; /* Monster race spell flags preloaded */
-    int16_t      when; /* When last seen */
+    borg_time    when; /* When last seen */
     int16_t      m_idx; /* Game's index */
 };
 
@@ -70,7 +71,6 @@ struct borg_kill {
  * The monster list.  This list is used to "track" monsters.
  */
 extern int16_t    borg_kills_cnt;
-extern int16_t    borg_kills_summoner; /* index of a summoning guy */
 extern int16_t    borg_kills_nxt;
 extern borg_kill *borg_kills;
 
@@ -84,34 +84,10 @@ extern int16_t *borg_race_count;
  */
 extern int16_t *borg_race_death;
 
-/*
- * Monsters or Uniques on this level
- */
-extern unsigned int borg_morgoth_id;
-extern unsigned int borg_sauron_id;
-extern unsigned int borg_tarrasque_id;
-
-extern unsigned int unique_on_level;
-extern bool         scaryguy_on_level;
-extern bool         morgoth_on_level;
-extern bool         borg_morgoth_position;
-extern bool         breeder_level;
-
 extern uint8_t borg_nasties_num;
 extern uint8_t borg_nasties_count[7];
 extern char    borg_nasties[7];
 extern uint8_t borg_nasties_limit[7];
-
-extern int morgy_panel_y;
-extern int morgy_panel_x;
-
-/* am I fighting a unique? */
-extern int borg_fighting_unique;
-extern bool
-    borg_fighting_evil_unique; /* Need to know if evil for Priest Banishment */
-
-/* am I fighting a summoner? */
-extern bool borg_fighting_summoner;
 
 /*
  * Helper to get the name of a race.

@@ -45,8 +45,8 @@ extern int borg_slot(int tval, int sval);
 /*
  * Cheat/Parse the "equip" and "inven" screens.
  */
-extern void borg_cheat_equip(void);
-extern void borg_cheat_inven(void);
+extern void borg_equipment(void);
+extern void borg_inventory(void);
 
 /*
  * Helper to find the first empty slot

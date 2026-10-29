@@ -34,6 +34,7 @@
 #include "borg-item-use.h"
 #include "borg-item-val.h"
 #include "borg-power.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -55,8 +56,9 @@ bool borg_destroy_floor(void)
     if (take->value != -10)
         return false;
 
-    if (take->kind && take->kind->base)
-        borg_note(format("# Destroying floor item %s%s", take->kind->base->name, take->kind->name));
+    if (take->kidx && k_info[take->kidx].base)
+        borg_note(format("# Destroying floor item %s%s",
+            k_info[take->kidx].base->name, k_info[take->kidx].name));
     else
         borg_note("# Destroying floor item.");
 
@@ -207,7 +209,7 @@ static bool borg_consume(int i)
 
     case TV_FOOD:
         /* Check the grub */
-        if (item->sval == sv_food_ration 
+        if (item->sval == sv_food_ration
             || item->sval == sv_food_slime_mold
             || item->sval == sv_food_waybread)
 
@@ -224,11 +226,11 @@ static bool borg_consume(int i)
             || item->sval == sv_mush_fast_recovery
             || item->sval == sv_mush_cure_mind
             || item->sval == sv_mush_restoring
-            || item->sval == sv_mush_emergency 
+            || item->sval == sv_mush_emergency
             || item->sval == sv_mush_terror
-            || item->sval == sv_mush_stoneskin 
+            || item->sval == sv_mush_stoneskin
             || item->sval == sv_mush_debility
-            || item->sval == sv_mush_sprinting 
+            || item->sval == sv_mush_sprinting
             || item->sval == sv_mush_purging)
 
             /* Try eating the food (unless Bloated) */
@@ -501,10 +503,10 @@ bool borg_drop_junk(void)
  * presence of unknown items by a massively heuristic value.
  *
  * The borg makes two attempts to find something to drop.  The first
- * time important things are never dropped.  The second time, things 
- * that are somewhat important, like things not identified yet, can be 
+ * time important things are never dropped.  The second time, things
+ * that are somewhat important, like things not identified yet, can be
  * considered.
- * 
+ *
  * If the Borg cannot find something to drop, which should only
  * happen if he fills up with artifacts, then he will probably act
  * rather twitchy for a while.
@@ -525,7 +527,7 @@ bool borg_drop_hole(bool desperate)
     /* Do not destroy items unless we need the space */
     if (!borg_items[PACK_SLOTS - 1].iqty)
         return false;
-    
+
     /* only on the floor */
     if (borg_grids[borg.c.y][borg.c.x].feat != FEAT_FLOOR)
         return false;
@@ -673,7 +675,7 @@ bool borg_drop_hole(bool desperate)
         /* Penalize loss of "gold" */
 
         /* if the item gives a bonus to a stat, boost its value */
-        if (item->modifiers[OBJ_MOD_STR] > 0 
+        if (item->modifiers[OBJ_MOD_STR] > 0
             || item->modifiers[OBJ_MOD_INT] > 0
             || item->modifiers[OBJ_MOD_WIS] > 0
             || item->modifiers[OBJ_MOD_DEX] > 0
@@ -1167,9 +1169,9 @@ bool borg_dump_quiver(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg_t - borg_began > 2000)
+    if (borg_timer(borg.time.level) > 2000)
         return false;
-    if (borg.time_this_panel > 150)
+    if (borg.antibounce_count > 150)
         return false;
 
     /* don't crush stuff unless we are on a floor */
@@ -1238,7 +1240,7 @@ bool borg_dump_quiver(void)
         }
 
         /* Did something */
-        borg.time_this_panel++;
+        borg.antibounce_count++;
         return true;
     }
 
@@ -1253,7 +1255,7 @@ bool borg_dump_quiver(void)
  *
  * Basically, we evaluate the world both with the current set of
  * equipment, and in the alternate world in which various items
- * are removed, and we take one step towards the world in which 
+ * are removed, and we take one step towards the world in which
  * we have the most "power".
  */
 bool borg_remove_stuff(void)
@@ -1281,9 +1283,9 @@ bool borg_remove_stuff(void)
 
     /* Forbid if been sitting on level forever */
     /*    Just come back and work through the loop later */
-    if (borg_t - borg_began > 2000)
+    if (borg_timer(borg.time.level) > 2000)
         return false;
-    if (borg.time_this_panel > 150)
+    if (borg.antibounce_count > 150)
         return false;
 
     /* Start with good power */
@@ -1358,7 +1360,7 @@ bool borg_remove_stuff(void)
         borg_keypress(all_letters_nohjkl[b_i - INVEN_WIELD]);
 
         /* Did something */
-        borg.time_this_panel++;
+        borg.antibounce_count++;
         return true;
     }
 

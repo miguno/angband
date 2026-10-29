@@ -1183,12 +1183,15 @@ static int longest_terrain_name(void)
  */
 static size_t prt_terrain(int row, int col)
 {
-	struct feature *feat = square_feat(cave, player->grid);
-	struct trap *trap = square_trap(cave, player->grid);
+	struct feature *feat = square_feat(player->cave, player->grid);
+	struct trap *trap = square_trap(player->cave, player->grid);
 	char buf[30];
 	uint8_t attr;
 
-	if (trap && !square_isinvis(cave, player->grid)) {
+	if (feat->mimic) {
+		feat = feat->mimic;
+	}
+	if (trap && square_isknown(cave, player->grid)) {
 		my_strcpy(buf, trap->kind->name, sizeof(buf));
 		attr = trap->kind->d_attr;
 	} else {
@@ -1335,25 +1338,34 @@ static void trace_map_updates(game_event_type type, game_event_data *data,
 							  void *user)
 {
 	if (data->point.x == -1 && data->point.y == -1)
-		printf("Redraw whole map\n");
+		printf("Update whole map\n");
 	else
-		printf("Redraw (%i, %i)\n", data->point.x, data->point.y);
+		printf("Update (%i, %i)\n", data->point.x, data->point.y);
 }
 #endif
 
+
 /**
  * Update either a single map grid or a whole map
+ *
+ * Does not push the update to the output device by calling Term_fresh() -
+ * assumes all map terminals register an EVENT_END handler which calls
+ * Term_fresh().  If a panel change will happen later (player->upkeep->update &
+ * PU_PANEL is nonzero and the panel would change) or a full map update will
+ * happen later (player->upkeep->redraw & PR_MAP is nonzero) and this is a
+ * single point update, might be able to save time by bailing out early here.
+ * That will only be the case if the calculations averted are more expensive
+ * than the extra checks incurred here.
  */
 static void update_maps(game_event_type type, game_event_data *data, void *user)
 {
 	term *t = user;
 
-	/* This signals a whole-map redraw. */
-	if (data->point.x == -1 && data->point.y == -1)
+	if (data->point.x == -1 && data->point.y == -1) {
+		/* This signals a whole-map update. */
 		prt_map();
-
-	/* Single point to be redrawn */
-	else {
+	} else {
+		/* Single point to be updated */
 		struct grid_data g;
 		int a, ta;
 		wchar_t c, tc;
@@ -1390,7 +1402,6 @@ static void update_maps(game_event_type type, game_event_data *data, void *user)
 			clipy = t->hgt;
 		}
 
-
 		/* Redraw the grid spot */
 		map_info(data->point, &g);
 		grid_data_as_text(&g, &a, &c, &ta, &tc);
@@ -1400,22 +1411,13 @@ static void update_maps(game_event_type type, game_event_data *data, void *user)
 		Term_queue_char(t, vx, vy, COLOUR_L_GREEN, c, ta, tc);
 #endif
 
-		if ((tile_width > 1) || (tile_height > 1))
-			Term_big_queue_char(t, vx, vy, clipy, a, c, COLOUR_WHITE, L' ');
+		if ((tile_width > 1) || (tile_height > 1)) {
+			Term_big_queue_char(t, vx, vy, clipy, a, c,
+				COLOUR_WHITE, L' ');
+		}
 	}
 
-	/* Refresh the main screen unless the map needs to center */
-	if (player->upkeep->update & (PU_PANEL) && OPT(player, center_player)) {
-		int hgt = (t == angband_term[0]) ? SCREEN_HGT / 2 :
-			t->hgt / (tile_height * 2);
-		int wid = (t == angband_term[0]) ? SCREEN_WID / 2 :
-			t->wid / (tile_width * 2);
-
-		if (panel_should_modify(t, player->grid.y - hgt, player->grid.x - wid))
-			return;
-	}
-
-	Term_fresh();
+	player->upkeep->redraw |= (PR_REFRESH_MAP);
 }
 
 /**
@@ -1464,7 +1466,8 @@ static void do_animation(void)
 			continue;
 
 		mon->attr = attr;
-		player->upkeep->redraw |= (PR_MAP | PR_MONLIST);
+		event_signal_point(EVENT_MAP, mon->grid.x, mon->grid.y);
+		player->upkeep->redraw |= (PR_MONLIST);
 	}
 
 	flicker++;
@@ -1603,9 +1606,7 @@ static void display_explosion(game_event_type type, game_event_data *data,
 		/* We have all the grids at the current radius, so draw it */
 		if (new_radius) {
 			/* Flush all the grids at this radius */
-			Term_fresh();
-			if (player->upkeep->redraw)
-				redraw_stuff(player);
+			event_signal(EVENT_END);
 
 			/* Delay to show this radius appearing */
 			if (drawn || drawing) {
@@ -1633,9 +1634,7 @@ static void display_explosion(game_event_type type, game_event_data *data,
 		move_cursor_relative(centre.y, centre.x);
 
 		/* Flush the explosion */
-		Term_fresh();
-		if (player->upkeep->redraw)
-			redraw_stuff(player);
+		redraw_stuff(player);
 	}
 }
 
@@ -1666,14 +1665,10 @@ static void display_bolt(game_event_type type, game_event_data *data,
 		/* Visual effects */
 		print_rel(c, a, y, x);
 		move_cursor_relative(y, x);
-		Term_fresh();
-		if (player->upkeep->redraw)
-			redraw_stuff(player);
+		event_signal(EVENT_END);
 		Term_xtra(TERM_XTRA_DELAY, msec);
 		event_signal_point(EVENT_MAP, x, y);
-		Term_fresh();
-		if (player->upkeep->redraw)
-			redraw_stuff(player);
+		redraw_stuff(player);
 
 		/* Display "beam" grids */
 		if (beam) {
@@ -1707,14 +1702,12 @@ static void display_missile(game_event_type type, game_event_data *data,
 		print_rel(object_char(obj), object_attr(obj), y, x);
 		move_cursor_relative(y, x);
 
-		Term_fresh();
-		if (player->upkeep->redraw) redraw_stuff(player);
+		event_signal(EVENT_END);
 
 		Term_xtra(TERM_XTRA_DELAY, msec);
 		event_signal_point(EVENT_MAP, x, y);
 
-		Term_fresh();
-		if (player->upkeep->redraw) redraw_stuff(player);
+		redraw_stuff(player);
 	}
 }
 
@@ -1928,7 +1921,7 @@ static void update_messages_subwindow(game_event_type type,
 		Term_locate(&x, &y);
 
 		/* Clear to end of line */
-		Term_erase(x, y, 255);
+		Term_erase(x, y, w - x);
 		if (i == 0){
 			last_msg = str;
 		}
@@ -2182,7 +2175,7 @@ static void subwindow_flag_changed(int win_idx, uint32_t flag, bool new_state)
 	void (*set_register_or_deregister)(game_event_type *type, size_t n_events,
 									   game_event_handler *fn, void *user);
 
-	/* Decide whether to register or deregister an evenrt handler */
+	/* Decide whether to register or deregister an event handler */
 	if (new_state == false) {
 		register_or_deregister = event_remove_handler;
 		set_register_or_deregister = event_remove_handler_set;
@@ -2414,7 +2407,7 @@ static void splashscreen_note(game_event_type type, game_event_data *data,
 		if (++y >= 24) y = 2;
 	} else {
 		char *s = format("[%s]", data->message.msg);
-		Term_erase(0, (Term->hgt - 23) / 5 + 23, 255);
+		Term_erase(0, (Term->hgt - 23) / 5 + 23, Term->wid);
 		Term_putstr((Term->wid - strlen(s)) / 2, (Term->hgt - 23) / 5 + 23, -1,
 					COLOUR_WHITE, s);
 	}
@@ -2738,11 +2731,16 @@ static void ui_enter_world(game_event_type type, game_event_data *data,
 	/* Player HP can optionally change the colour of the '@' now. */
 	event_add_handler(EVENT_HP, hp_colour_change, NULL);
 
-	/* Simplest way to keep the map up to date - will do for now */
+	/*
+	 * Simplest way to keep the map up to date - as noted in the comment
+	 * for update_maps() need an EVENT_END handler that will push the
+	 * updates to the output device
+	 */
 	event_add_handler(EVENT_MAP, update_maps, angband_term[0]);
 #ifdef MAP_DEBUG
 	event_add_handler(EVENT_MAP, trace_map_updates, angband_term[0]);
 #endif
+	event_add_handler(EVENT_END, flush_subwindow, angband_term[0]);
 
 	/* Check if the panel should shift when the player's moved */
 	event_add_handler(EVENT_PLAYERMOVED, check_panel, NULL);
@@ -2808,6 +2806,7 @@ static void ui_leave_world(game_event_type type, game_event_data *data,
 #ifdef MAP_DEBUG
 	event_remove_handler(EVENT_MAP, trace_map_updates, angband_term[0]);
 #endif
+	event_remove_handler(EVENT_END, flush_subwindow, angband_term[0]);
 
 	/* Check if the panel should shift when the player's moved */
 	event_remove_handler(EVENT_PLAYERMOVED, check_panel, NULL);

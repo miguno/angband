@@ -35,6 +35,7 @@
 #include "borg-item-val.h"
 #include "borg-magic.h"
 #include "borg-projection.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -87,25 +88,6 @@ struct borg_track track_door;
  * Track closed doors which started closed
  */
 struct borg_track track_closed;
-
-bool borg_desperate = false;
-
-/*
- * HACK assume a permeant wall in the center is a part of a vault
- */
-bool vault_on_level;
-
-/*
- * Anti-Summon
- */
-int  borg_t_antisummon; /* Timestamp when in a AS spot */
-bool borg_as_position; /* Sitting in an anti-summon corridor */
-bool borg_digging; /* used in Anti-summon corridor */
-bool my_need_alter; /* in case i hit a wall or door */
-bool my_no_alter;
-bool my_need_redraw; /* in case i hit a wall or door */
-
-int16_t avoidance = 0; /* Current danger thresh-hold */
 
 /*
  * ghijk  The borg will use the following ddx and ddy to search
@@ -168,7 +150,7 @@ bool borg_can_dig(bool check_fail, uint8_t feat)
             || borg_equips_ring(sv_ring_digging))
             return true;
     } else {
-        if (borg_spell_okay(TURN_STONE_TO_MUD) 
+        if (borg_spell_okay(TURN_STONE_TO_MUD)
             || borg_spell_okay(SHATTER_STONE)
             || borg_equips_item(act_stone_to_mud, false)
             || borg_equips_ring(sv_ring_digging))
@@ -289,7 +271,7 @@ void borg_flow_spread(int depth, bool optimize, bool avoid, bool tunneling,
     origin_x = borg.c.x;
 
     /* Is the borg moving under boosted bravery? */
-    if (avoidance > borg.trait[BI_CURHP])
+    if (borg.avoidance > borg.trait[BI_CURHP])
         twitchy = true;
 
     /* Use the closest stair for calculation distance (cost) from the stair to
@@ -351,7 +333,7 @@ void borg_flow_spread(int depth, bool optimize, bool avoid, bool tunneling,
             /* Access the grid */
             ag = &borg_grids[y][x];
 
-            if (sneak && !borg_desperate && !twitchy) {
+            if (sneak && !borg.status.desperate && !twitchy) {
                 /* Scan the neighbors */
                 for (ii = 0; ii < 8; ii++) {
                     /* Neighbor grid */
@@ -394,14 +376,14 @@ void borg_flow_spread(int depth, bool optimize, bool avoid, bool tunneling,
             /* Avoid unknown grids (if requested or retreating)
              * unless twitchy.  In which case, explore it
              */
-            if ((avoid || borg_desperate) && (ag->feat == FEAT_NONE)
+            if ((avoid || borg.status.desperate) && (ag->feat == FEAT_NONE)
                 && !twitchy)
                 continue;
 
             /* flowing into monsters */
             if ((ag->kill)) {
                 /* Avoid if Desperate, lunal */
-                if (borg_desperate || borg.lunal_mode || borg.munchkin_mode)
+                if (borg.status.desperate || borg.lunal_mode || borg.munchkin_mode)
                     continue;
 
                 /* Avoid if afraid */
@@ -455,33 +437,33 @@ void borg_flow_spread(int depth, bool optimize, bool avoid, bool tunneling,
                 /* Mark as known */
                 borg_data_know->data[y][x] = true;
 
-                if (!borg_desperate && !borg.lunal_mode && !borg.munchkin_mode
-                    && !borg_digging) {
+                if (!borg.status.desperate && !borg.lunal_mode && !borg.munchkin_mode
+                    && !borg.status.digging) {
                     /* Get the danger */
                     p = borg_danger(y, x, 1, true, false);
 
                     /* Increase bravery */
                     if (borg.trait[BI_MAXCLEVEL] == 50)
-                        fear = avoidance * 5 / 10;
+                        fear = borg.avoidance * 5 / 10;
                     if (borg.trait[BI_MAXCLEVEL] != 50)
-                        fear = avoidance * 3 / 10;
-                    if (scaryguy_on_level)
-                        fear = avoidance * 2;
-                    if (unique_on_level && vault_on_level
+                        fear = borg.avoidance * 3 / 10;
+                    if (borg.mon.scary)
+                        fear = borg.avoidance * 2;
+                    if (borg.mon.unique && borg.status.vault
                         && borg.trait[BI_MAXCLEVEL] == 50)
-                        fear = avoidance * 3;
-                    if (scaryguy_on_level && borg.trait[BI_CLEVEL] <= 5)
-                        fear = avoidance * 3;
+                        fear = borg.avoidance * 3;
+                    if (borg.mon.scary && borg.trait[BI_CLEVEL] <= 5)
+                        fear = borg.avoidance * 3;
                     if (borg.goal.ignoring)
-                        fear = avoidance * 5;
-                    if (borg_t - borg_began > 5000)
-                        fear = avoidance * 25;
+                        fear = borg.avoidance * 5;
+                    if (borg_timer(borg.time.level) > 5000)
+                        fear = borg.avoidance * 25;
                     if (borg.trait[BI_FOOD] == 0)
-                        fear = avoidance * 100;
+                        fear = borg.avoidance * 100;
 
                     /* Normal in town */
                     if (borg.trait[BI_CLEVEL] == 0)
-                        fear = avoidance * 3 / 10;
+                        fear = borg.avoidance * 3 / 10;
 
                     /* Dangerous grid */
                     if (p > fear) {
@@ -543,29 +525,29 @@ void borg_flow_enqueue_grid(int y, int x)
 
         /* Increase bravery */
         if (borg.trait[BI_MAXCLEVEL] == 50)
-            fear = avoidance * 5 / 10;
+            fear = borg.avoidance * 5 / 10;
         if (borg.trait[BI_MAXCLEVEL] != 50)
-            fear = avoidance * 3 / 10;
-        if (scaryguy_on_level)
-            fear = avoidance * 2;
-        if (unique_on_level && vault_on_level && borg.trait[BI_MAXCLEVEL] == 50)
-            fear = avoidance * 3;
-        if (scaryguy_on_level && borg.trait[BI_CLEVEL] <= 5)
-            fear = avoidance * 3;
+            fear = borg.avoidance * 3 / 10;
+        if (borg.mon.scary)
+            fear = borg.avoidance * 2;
+        if (borg.mon.unique && borg.status.vault && borg.trait[BI_MAXCLEVEL] == 50)
+            fear = borg.avoidance * 3;
+        if (borg.mon.scary && borg.trait[BI_CLEVEL] <= 5)
+            fear = borg.avoidance * 3;
         if (borg.goal.ignoring)
-            fear = avoidance * 5;
-        if (borg_t - borg_began > 5000)
-            fear = avoidance * 25;
+            fear = borg.avoidance * 5;
+        if (borg_timer(borg.time.level) > 5000)
+            fear = borg.avoidance * 25;
         if (borg.trait[BI_FOOD] == 0)
-            fear = avoidance * 100;
+            fear = borg.avoidance * 100;
 
         /* Normal in town */
         if (borg.trait[BI_CLEVEL] == 0)
-            fear = avoidance * 3 / 10;
+            fear = borg.avoidance * 3 / 10;
 
         /* Dangerous grid */
-        if ((p > fear) && !borg_desperate && !borg.lunal_mode
-            && !borg.munchkin_mode && !borg_digging) {
+        if ((p > fear) && !borg.status.desperate && !borg.lunal_mode
+            && !borg.munchkin_mode && !borg.status.digging) {
             /* Icky */
             borg_data_icky->data[y][x] = true;
 
@@ -638,7 +620,7 @@ static bool borg_play_step(int y2, int x2)
     int o_y = 0, o_x = 0, door_found = 0;
 
     /* Breeder levels, close all doors */
-    if (breeder_level) {
+    if (borg.near.breeder) {
         /* scan the adjacent grids */
         for (ox = -1; ox <= 1; ox++) {
             for (oy = -1; oy <= 1; oy++) {
@@ -768,9 +750,9 @@ static bool borg_play_step(int y2, int x2)
             borg_race_name(kill->r_idx), kill->pos.y, kill->pos.x));
 
         /* Walk into it */
-        if (my_no_alter) {
+        if (borg.status.no_alter) {
             borg_keypress(';');
-            my_no_alter = false;
+            borg.status.no_alter = false;
         } else {
             borg_keypress('+');
         }
@@ -779,7 +761,7 @@ static bool borg_play_step(int y2, int x2)
     }
 
     /* Objects -- Take */
-    if (ag->take && borg_takes[ag->take].kind) {
+    if (ag->take && borg_takes[ag->take].kidx) {
         borg_take *take = &borg_takes[ag->take];
 
         /*** Handle Chests ***/
@@ -790,8 +772,8 @@ static bool borg_play_step(int y2, int x2)
          * So there is no advantage to the borg.
          */
 
-        if (strstr(take->kind->name, "chest")
-            && !strstr(take->kind->name, "Ruined")) {
+        if (strstr(k_info[take->kidx].name, "chest")
+            && !strstr(k_info[take->kidx].name, "Ruined")) {
             struct object *o_ptr = borg_get_top_object(cave, loc(x2, y2));
 
             /* this should only happen when something picks up the chest */
@@ -806,7 +788,7 @@ static bool borg_play_step(int y2, int x2)
                 && borg.trait[BI_DEV] - o_ptr->pval
                        >= borg_cfg[BORG_CHEST_FAIL_TOLERANCE]) {
                 borg_note(format("# Disarming a '%s' at (%d,%d)",
-                    take->kind->name, take->y, take->x));
+                    k_info[take->kidx].name, take->y, take->x));
 
                 /* Open it */
                 borg_keypress('D');
@@ -817,7 +799,7 @@ static bool borg_play_step(int y2, int x2)
             /* No trap, or unknown trap that passed above checks - Open it */
             if (o_ptr->pval < 0 || !o_ptr->known) {
                 borg_note(format("# Opening a '%s' at (%d,%d)",
-                    take->kind->name, take->y, take->x));
+                    k_info[take->kidx].name, take->y, take->x));
 
                 /* Open it */
                 borg_keypress('o');
@@ -884,7 +866,7 @@ static bool borg_play_step(int y2, int x2)
         /*** Handle other takes ***/
         /* Message */
         borg_note(format("# Walking onto and deleting a '%s' at (%d,%d)",
-            take->kind->name, take->y, take->x));
+            k_info[take->kidx].name, take->y, take->x));
 
         /* Delete the item from the list */
         borg_delete_take(ag->take);
@@ -909,7 +891,7 @@ static bool borg_play_step(int y2, int x2)
     /* NOTE: If a scary guy is on the level, we allow the borg to run over */
     /* the trap in order to escape this level. */
     if (borg.trait[BI_LIGHT] && !borg.trait[BI_ISBLIND]
-        && !borg.trait[BI_ISCONFUSED] && !scaryguy_on_level && ag->trap) {
+        && !borg.trait[BI_ISCONFUSED] && !borg.mon.scary && ag->trap) {
 
         /* allow "destroy doors" activation */
         if (borg_activate_item(act_disable_traps)) {
@@ -975,7 +957,7 @@ static bool borg_play_step(int y2, int x2)
         }
 
         /* Use other techniques from time to time */
-        if (!randint0(100) || borg.time_this_panel >= 500) {
+        if (!randint0(100) || borg.antibounce_count >= 500) {
             /* Mega-Hack -- allow "destroy doors" */
             if (borg_spell(DISABLE_TRAPS_DESTROY_DOORS)
                 || borg_activate_item(act_destroy_doors)) {
@@ -1002,9 +984,9 @@ static bool borg_play_step(int y2, int x2)
         }
 
         /* Open */
-        if (my_need_alter) {
+        if (borg.status.need_alter) {
             borg_keypress('+');
-            my_need_alter = false;
+            borg.status.need_alter = false;
         } else {
             borg_note("# Opening a door");
             borg_keypress('o');
@@ -1057,7 +1039,7 @@ static bool borg_play_step(int y2, int x2)
         }
 
         /* Mega-Hack -- prevent infinite loops */
-        if (randint0(500) <= 5 && !vault_on_level)
+        if (randint0(500) <= 5 && !borg.status.vault)
             return false;
 
         /* Switch to a digger if we have one is automatic */
@@ -1085,9 +1067,9 @@ static bool borg_play_step(int y2, int x2)
     }
 
     /* Walk in that direction */
-    if (my_need_alter) {
+    if (borg.status.need_alter) {
         borg_keypress('+');
-        my_need_alter = false;
+        borg.status.need_alter = false;
     } else {
         /* nothing */
     }
@@ -1210,7 +1192,7 @@ bool borg_flow_old(int why)
         /* Mark a timestamp to wait on a anti-summon spot for a few turns */
         if (borg.goal.type == GOAL_DIGGING && borg.c.y == borg_flow_y[0]
             && borg.c.x == borg_flow_x[0])
-            borg_t_antisummon = borg_t;
+            borg.time.antisummon = borg.time.now;
 
         /* Cancel goal */
         borg.goal.type = 0;
@@ -1238,15 +1220,21 @@ void borg_free_track(struct borg_track *track)
 {
     track->num  = 0;
     track->size = 0;
-    mem_free(track->x);
-    track->x = NULL;
-    mem_free(track->y);
-    track->y = NULL;
+    if (track->x) {
+        mem_free(track->x);
+        track->x = NULL;
+    }
+    if (track->y) {
+        mem_free(track->y);
+        track->y = NULL;
+    }
 }
 
 void borg_init_flow(void)
 {
     int x, y;
+
+    borg_free_flow();
 
     /*** Grid data ***/
 
@@ -1297,16 +1285,30 @@ void borg_free_flow(void)
     borg_free_track(&track_door);
     borg_free_track(&track_step);
 
-    mem_free(borg_data_icky);
-    borg_data_icky = NULL;
-    mem_free(borg_data_know);
-    borg_data_know = NULL;
-    mem_free(borg_data_hard);
-    borg_data_hard = NULL;
-    mem_free(borg_data_cost);
-    borg_data_cost = NULL;
-    mem_free(borg_data_flow);
-    borg_data_flow = NULL;
+    if (borg_data_flow) {
+        mem_free(borg_data_flow);
+        borg_data_flow = NULL;
+    }
+    if (borg_data_icky) {
+        mem_free(borg_data_icky);
+        borg_data_icky = NULL;
+    }
+    if (borg_data_know) {
+        mem_free(borg_data_know);
+        borg_data_know = NULL;
+    }
+    if (borg_data_hard) {
+        mem_free(borg_data_hard);
+        borg_data_hard = NULL;
+    }
+    if (borg_data_cost) {
+        mem_free(borg_data_cost);
+        borg_data_cost = NULL;
+    }
+    if (borg_data_flow) {
+        mem_free(borg_data_flow);
+        borg_data_flow = NULL;
+    }
 }
 
 #endif

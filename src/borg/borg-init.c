@@ -57,7 +57,7 @@ bool borg_init_failure = false;
 struct borg_setting borg_settings[] = {
     { "borg_verbose", 'b', false },
     { "borg_munchkin_start", 'b', false },
-    { "borg_munchkin_level", 'i', 12 }, 
+    { "borg_munchkin_level", 'i', 12 },
     { "borg_munchkin_depth", 'i', 16 },
     { "borg_worships_damage", 'b', false },
     { "borg_worships_speed", 'b', false },
@@ -66,25 +66,25 @@ struct borg_setting borg_settings[] = {
     { "borg_worships_ac", 'b', false },
     { "borg_worships_gold", 'b', false },
     { "borg_plays_risky", 'b', false },
-    { "borg_kills_uniques", 'b', false }, 
+    { "borg_kills_uniques", 'b', false },
     { "borg_uses_swaps", 'b', true },
     { "borg_uses_dynamic_calcs", 'b', false },
-    { "borg_stop_dlevel", 'i', 128 }, 
+    { "borg_stop_dlevel", 'i', 128 },
     { "borg_stop_clevel", 'i', 51 },
-    { "borg_no_deeper", 'i', 127 }, 
+    { "borg_no_deeper", 'i', 127 },
     { "borg_stop_king", 'b', true },
     { "borg_cheat_death", 'b', false },
     { "borg_respawn_winners", 'b', false },
-    { "borg_respawn_class", 'i', -1 }, 
+    { "borg_respawn_class", 'i', -1 },
     { "borg_respawn_race", 'i', -1 },
     { "borg_chest_fail_tolerance", 'i', 7 },
-    { "borg_delay_factor", 'i', 0 }, 
+    { "borg_delay_factor", 'i', 0 },
     { "borg_money_scum_amount", 'i', 0 },
-    { "borg_self_scum", 'b', true }, 
+    { "borg_self_scum", 'b', true },
     { "borg_lunal_mode", 'b', false },
-    { "borg_self_lunal", 'b', false }, 
+    { "borg_self_lunal", 'b', false },
     { "borg_enchant_limit", 'i', 12 },
-    { "borg_dump_level", 'i', 1 }, 
+    { "borg_dump_level", 'i', 1 },
     { "borg_save_death", 'i', 1 },
     { "borg_stop_on_bell", 'b', false },
     { "borg_allow_strange_opts", 'b', false},
@@ -157,7 +157,8 @@ static void borg_free_txt_file(void)
     borg_trait_free();
     borg_free_formulas();
 
-    mem_free(borg_cfg);
+    if (borg_cfg)
+        mem_free(borg_cfg);
     borg_cfg = NULL;
 }
 
@@ -173,10 +174,7 @@ bool borg_init_txt_file(void)
     int i;
     bool warning = false;
 
-
-    if (borg_active)
-        borg_free_txt_file();
-
+    borg_free_txt_file();
     borg_trait_init();
 
     /* a couple of spot checks on settings definitions */
@@ -341,28 +339,33 @@ void borg_reset_ignore(void)
     int i, j;
 
     if (borg_cfg[BORG_RESTORE_IGNORE_SETTINGS]) {
-        /* Reset ignore bits */
-        for (i = 0; i < z_info->k_max; i++)
-            k_info[i].ignore = borg_init_save.kinfo_ignore[i];
+        if (borg.init_save.kinfo_ignore) {
+            /* Reset ignore bits */
+            for (i = 0; i < z_info->k_max; i++)
+                k_info[i].ignore = borg.init_save.kinfo_ignore[i];
+        }
 
         /* Clear the ignore bytes */
         for (i = ITYPE_NONE; i < ITYPE_MAX; i++)
-            ignore_level[i] = borg_init_save.ignore_level[i];
+            ignore_level[i] = borg.init_save.ignore_level[i];
 
         /* Clear ego ignore */
-        for (i = 0; i < z_info->e_max; i++)
-            for (j = ITYPE_NONE; j < ITYPE_MAX; j++)
-                ego_ignore_types[i][j] = borg_init_save.ego_ignore_types[i][j];
+        if (borg.init_save.ego_ignore_types) {
+            for (i = 0; i < z_info->e_max; i++)
+                for (j = ITYPE_NONE; j < ITYPE_MAX; j++)
+                    ego_ignore_types[i][j]
+                        = borg.init_save.ego_ignore_types[i][j];
+        }
     }
 
     for (i = 0; i < z_info->e_max; i++)
-        mem_free(borg_init_save.ego_ignore_types[i]);
-    mem_free(borg_init_save.ego_ignore_types);
+        mem_free(borg.init_save.ego_ignore_types[i]);
+    mem_free(borg.init_save.ego_ignore_types);
 
-    borg_init_save.ego_ignore_types = NULL;
+    borg.init_save.ego_ignore_types = NULL;
 
-    mem_free(borg_init_save.kinfo_ignore);
-    borg_init_save.kinfo_ignore = NULL;
+    mem_free(borg.init_save.kinfo_ignore);
+    borg.init_save.kinfo_ignore = NULL;
 }
 
 
@@ -371,24 +374,24 @@ static void borg_init_ignore(void)
     int i, j;
 
     /* allocate the memory */
-    borg_init_save.kinfo_ignore = mem_alloc(sizeof(uint8_t) * z_info->k_max);
- 
-    borg_init_save.ego_ignore_types = mem_zalloc(z_info->e_max * sizeof(bool*));
+    borg.init_save.kinfo_ignore = mem_alloc(sizeof(uint8_t) * z_info->k_max);
+
+    borg.init_save.ego_ignore_types = mem_zalloc(z_info->e_max * sizeof(bool*));
     for (i = 0; i < z_info->e_max; i++)
-        borg_init_save.ego_ignore_types[i] = mem_zalloc(ITYPE_MAX * sizeof(bool));
+        borg.init_save.ego_ignore_types[i] = mem_zalloc(ITYPE_MAX * sizeof(bool));
 
     /* Reset ignore bits */
     for (i = 0; i < z_info->k_max; i++)
-        borg_init_save.kinfo_ignore[i] = k_info[i].ignore;
+        borg.init_save.kinfo_ignore[i] = k_info[i].ignore;
 
     /* Clear the ignore bytes */
     for (i = ITYPE_NONE; i < ITYPE_MAX; i++)
-        borg_init_save.ignore_level[i] = ignore_level[i];
+        borg.init_save.ignore_level[i] = ignore_level[i];
 
     /* Clear ego ignore */
     for (i = 0; i < z_info->e_max; i++)
         for (j = ITYPE_NONE; j < ITYPE_MAX; j++)
-            borg_init_save.ego_ignore_types[i][j] = ego_ignore_types[i][j];
+            borg.init_save.ego_ignore_types[i][j] = ego_ignore_types[i][j];
 
     /* clear the saved flags */
     ignore_birth_init();
@@ -400,7 +403,7 @@ static void borg_init_ignore(void)
 void borg_reinit_options(void)
 {
     /* Save current key mode */
-    borg_init_save.key_mode = OPT(player, rogue_like_commands) ? KEYMAP_MODE_ROGUE
+    borg.init_save.key_mode = OPT(player, rogue_like_commands) ? KEYMAP_MODE_ROGUE
                                                 : KEYMAP_MODE_ORIG;
 
     borg_init_ignore();
@@ -440,6 +443,20 @@ void borg_reinit_options(void)
     player->opts.hitpoint_warn = 0;
 }
 
+void borg_reset_settings(void)
+{
+    /* Restore user key mode */
+    if (borg.init_save.key_mode == KEYMAP_MODE_ROGUE) {
+        option_set("rogue_like_commands", true);
+    }
+    else if (borg.init_save.key_mode == KEYMAP_MODE_ORIG) {
+        option_set("rogue_like_commands", false);
+    }
+
+    borg_reset_ignore();
+    borg_free_detection();
+}
+
 /*
  * Tell the borg that the game was closed.
  */
@@ -457,6 +474,15 @@ void borg_prepare_race_class_info(void)
 {
     /* Initialize the various spell arrays by book */
     borg_prepare_book_info();
+
+    /*
+     * Notice if the game is closed so a reinitialization can be done if the
+     * game is restarted without exiting.
+     * this needs to be done here because the game clears all events when
+     * the dungeon is recreated
+     */
+    game_closed = false;
+    event_add_handler(EVENT_LEAVE_GAME, borg_leave_game, NULL);
 }
 
 /*
@@ -489,6 +515,9 @@ void borg_init(void)
 
     borg.player = player; /* HACK work around msvc issue */
 
+    /* old depth starts at deepest level */
+    borg.status.old_depth = 128;
+
     /*** Initialize borg.ini options ***/
 
     /* Message */
@@ -509,42 +538,6 @@ void borg_init(void)
         option_set("cheat_live", true);
     }
 
-#ifndef ALLOW_BORG_GRAPHICS
-    if (!borg_graphics) {
-        int i, j;
-        /* Reset the # and % -- Scan the features */
-        for (i = 1; i < FEAT_MAX; i++) {
-            struct feature *f_ptr = &f_info[i];
-#if false
-            /* Skip non-features */
-            if (!f_ptr->name) continue;
-
-            /* Switch off "graphics" */
-            f_ptr->x_attr[3] = f_ptr->d_attr;
-            f_ptr->x_char[3] = f_ptr->d_char;
-#endif
-
-            /* Assume we will use the underlying values */
-            for (j = 0; j < LIGHTING_MAX; j++) {
-                feat_x_attr[j][i] = f_ptr->d_attr;
-                feat_x_char[j][i] = f_ptr->d_char;
-            }
-        }
-    }
-#endif
-
-#ifdef USE_GRAPHICS
-    /* The Borg can't work with graphics on, so switch it off */
-    if (use_graphics) {
-        /* Reset to ASCII mode */
-        use_graphics = false;
-        arg_graphics = false;
-
-        /* Reset visuals */
-        reset_visuals(true);
-    }
-#endif /* USE_GRAPHICS */
-
     /*** Redraw ***/
     /* Redraw map */
     player->upkeep->redraw |= (PR_MAP);
@@ -560,11 +553,11 @@ void borg_init(void)
     /*** Cheat / Panic ***/
 
     /* more cheating */
-    borg_cheat_death = false;
+    borg.status.cheat_death = false;
 
     /* set the continuous play mode if the game cheat death is on */
     if (OPT(player, cheat_live))
-        borg_cheat_death = true;
+        borg.status.cheat_death = true;
 
     /*** Initialize ***/
 
@@ -593,20 +586,13 @@ void borg_init(void)
     /* Notice the new race and class */
     borg_prepare_race_class_info();
 
-    /*
-     * Notice if the game is closed so a reinitialization can be done if the
-     * game is restarted without exiting.
-     */
-    game_closed = false;
-    event_add_handler(EVENT_LEAVE_GAME, borg_leave_game, NULL);
-
     /*** All done ***/
 
     /* Done initialization */
     borg_note("Initializing the Borg... done.");
 
     /* Reset the clock */
-    borg_t = 10;
+    borg.time.now = 10;
 
     /* note: I would check if player_id2class returns null but it */
     /* never does, even on a bad class */
@@ -625,27 +611,37 @@ void borg_init(void)
 
     /* Don't allow the user to do stupid things unless they ask to */
     if (!borg_cfg[BORG_ALLOW_STRANGE_OPTS]) {
+        if (tile_width > 1 || tile_height > 1) {
+            borg_note("**STARTUP FAILURE** Scaled tiles not allowed");
+            borg_note("** can be bypassed with borg_allow_strange_opts **");
+            borg_init_failure = true;
+        }
+
         if (OPT(player, birth_force_descend)) {
             borg_note("**STARTUP FAILURE** must allow up stairs");
             borg_note("** birth option failure **");
+            borg_note("** can be bypassed with borg_allow_strange_opts **");
             borg_init_failure = true;
         }
 
         if (!OPT(player, birth_connect_stairs)) {
             borg_note("**STARTUP FAILURE** must connect stairs");
             borg_note("** birth option failure **");
+            borg_note("** can be bypassed with borg_allow_strange_opts **");
             borg_init_failure = true;
         }
 
         if (OPT(player, birth_no_recall)) {
             borg_note("**STARTUP FAILURE** must allow recall");
             borg_note("** birth option failure **");
+            borg_note("** can be bypassed with borg_allow_strange_opts **");
             borg_init_failure = true;
         }
 
         if (OPT(player, birth_percent_damage)) {
             borg_note("**STARTUP FAILURE** strange damage calculation");
             borg_note("** birth option failure **");
+            borg_note("** can be bypassed with borg_allow_strange_opts **");
             borg_init_failure = true;
         }
     }

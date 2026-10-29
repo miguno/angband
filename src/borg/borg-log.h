@@ -38,7 +38,7 @@ extern void borg_log_death_data(void);
 /*
  * Display what the borg is thinking
  */
-extern void borg_status(void);
+extern void borg_display_status(void);
 
 /*
  * Write a file with the current dungeon info

@@ -25,6 +25,7 @@
 #include "../effects.h"
 #include "../ui-menu.h"
 
+#include "borg.h"
 #include "borg-cave-view.h"
 #include "borg-cave.h"
 #include "borg-io.h"

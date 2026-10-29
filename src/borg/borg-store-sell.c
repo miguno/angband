@@ -1137,15 +1137,14 @@ bool borg_think_shop_sell(void)
         /* The purchase is complete */
         borg.goal.shop = borg.goal.ware = borg.goal.item = -1;
 
-        /* tick the anti-loop clock */
-        borg.time_this_panel++;
+        /* Increment our anti-bounce count to avoid loops */
+        borg.antibounce_count++;
 
         /* I'm not in a store */
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
         borg_keypress(ESCAPE);
         borg.in_shop  = false;
-        borg_do_inven = true;
         /* Success */
         return true;
     }
@@ -1268,16 +1267,22 @@ int borg_count_sell(void)
 
 void borg_init_store_sell(void)
 {
+    borg_free_store_sell();
+
     test_item = mem_zalloc(z_info->store_inven_max * sizeof(uint8_t));
     best_item = mem_zalloc(z_info->store_inven_max * sizeof(uint8_t));
 }
 
 void borg_free_store_sell(void)
 {
-    mem_free(best_item);
-    best_item = NULL;
-    mem_free(test_item);
-    test_item = NULL;
+    if (test_item) {
+        mem_free(test_item);
+        test_item = NULL;
+    }
+    if (best_item) {
+        mem_free(best_item);
+        best_item = NULL;
+    }
 }
 
 #endif

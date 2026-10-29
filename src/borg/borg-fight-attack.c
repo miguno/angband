@@ -41,6 +41,7 @@
 #include "borg-item-val.h"
 #include "borg-item.h"
 #include "borg-projection.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg-update.h"
 #include "borg.h"
@@ -311,7 +312,7 @@ static int borg_attack_aux_thrust(void)
             /* Calculate danger */
             p = borg_danger_one_kill(y, x, 1, ag->kill, true, true);
 
-            if (p > avoidance * 2)
+            if (p > borg.avoidance * 2)
                 continue;
         }
 
@@ -505,7 +506,7 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
 
     /* Pure damage */
     case BORG_ATTACK_MANA:
-        if (borg_fighting_unique && borg.has[kv_potion_restore_mana] > 3)
+        if (borg.near.unique && borg.has[kv_potion_restore_mana] > 3)
             dam *= 2;
         break;
 
@@ -781,11 +782,11 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
                 dam = -9999;
 
             /* I am sitting pretty in an AS-Corridor */
-            else if (borg_as_position)
+            else if (borg.status.anti_summon)
                 dam = -9999;
 
             /* If this unique is causing the danger, get rid of it */
-            else if (dam > avoidance * 13 / 10 && borg.trait[BI_CDEPTH] <= 98) {
+            else if (dam > borg.avoidance * 13 / 10 && borg.trait[BI_CDEPTH] <= 98) {
                 /* get rid of this unique by storing his info */
                 borg_tp_other_index[borg_tp_other_n] = i;
                 borg_tp_other_y[borg_tp_other_n]     = kill->pos.y;
@@ -794,7 +795,7 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
             }
 
             /* If fighting multiple uniques, get rid of one */
-            else if (borg_fighting_unique >= 2 && borg_fighting_unique <= 8) {
+            else if (borg.near.unique >= 2 && borg.near.unique <= 8) {
                 /* get rid of one unique or both if they are in a beam-line */
                 borg_tp_other_index[borg_tp_other_n] = i;
                 borg_tp_other_y[borg_tp_other_n]     = kill->pos.y;
@@ -812,7 +813,7 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
 
             }
             /* Unique in a vault, get rid of it, clean vault */
-            else if (vault_on_level) {
+            else if (borg.status.vault) {
                 /* Scan grids adjacent to monster */
                 for (ii = 0; ii < 8; ii++) {
                     x = kill->pos.x + ddx_ddd[ii];
@@ -878,7 +879,7 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
         }
 
         /* If the borg is not in a good position, do it */
-        if (morgoth_on_level && !borg_morgoth_position) {
+        if (borg.near.morgoth && !borg.morgoth_position) {
             /* get rid of this one by storing his info */
             borg_tp_other_index[borg_tp_other_n] = i;
             borg_tp_other_y[borg_tp_other_n]     = kill->pos.y;
@@ -1046,7 +1047,7 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
             break;
         dam = borg_danger_one_kill(borg.c.y, borg.c.x, 2, i, true, true);
         /* don't bother unless he is a scary monster */
-        if ((dam < avoidance * 2) && !kill->afraid)
+        if ((dam < borg.avoidance * 2) && !kill->afraid)
             dam = 0;
         break;
 
@@ -1123,7 +1124,7 @@ static int borg_launch_damage_one(int i, int dam, int typ, int ammo_location)
     /* use Missiles on certain types of monsters */
     if ((borg.trait[BI_CDEPTH] >= 1)
         && (borg_danger_one_kill(kill->pos.y, kill->pos.x, 1, i, true, true)
-                > avoidance * 2 / 10
+                > borg.avoidance * 2 / 10
             || ((r_ptr->friends || r_ptr->friends_base) /* monster has friends*/
                 && kill->level >= borg.trait[BI_CLEVEL] - 5 /* close levels */)
             || kill->ranged_attack /* monster has a ranged attack */
@@ -1238,7 +1239,7 @@ static int borg_launch_bolt_aux_hack(int i, int dam, int typ, int ammo_location)
         return 0;
 
     /* Require current knowledge */
-    if (kill->when < borg_t - 2)
+    if (borg_timer(kill->when) > 2)
         return 0;
 
     /* Acquire location */
@@ -1307,7 +1308,7 @@ static int borg_launch_bolt_aux_hack(int i, int dam, int typ, int ammo_location)
     /* Avoid waking most "hard" sleeping monsters
      * !FIX !TODO: Combine similar checks in one place
      */
-    if (!kill->awake && (p2 > avoidance / 2) && (d < kill->power)
+    if (!kill->awake && (p2 > borg.avoidance / 2) && (d < kill->power)
         && !borg.munchkin_mode) {
         return (-999);
     }
@@ -1344,7 +1345,7 @@ static int borg_launch_bolt_aux_hack(int i, int dam, int typ, int ammo_location)
 static int borg_launch_destroy_stuff(borg_grid *ag, int typ)
 {
     struct borg_take *take = &borg_takes[ag->take];
-    struct object_kind *k_ptr = take->kind;
+    struct object_kind *k_ptr = &k_info[take->kidx];
 
     switch (typ) {
     case BORG_ATTACK_ACID:
@@ -1576,7 +1577,7 @@ static int borg_launch_bolt_at_location(
                 && !borg_detect_wall[q_y + 1][q_x + 0]
                 && !borg_detect_wall[q_y + 1][q_x + 1]
                 && borg_fear_region[borg.c.y / 11][borg.c.x / 11]
-                < avoidance / 20) {
+                < borg.avoidance / 20) {
 
                 /* Stop at unknown grids (see above) */
                 /* note if beam, dispel, this is the end of the beam */
@@ -1658,7 +1659,7 @@ static int borg_launch_bolt_at_location(
             /* probable damage int was just changed by b_l_b_a_h*/
 
             /* check destroyed stuff. */
-            if (ag->take && borg_takes[ag->take].kind)
+            if (ag->take && borg_takes[ag->take].kidx)
                 n -= borg_launch_destroy_stuff(ag, typ);
         }
     }
@@ -1913,7 +1914,7 @@ static int borg_launch_arc_at_location(
                     && !borg_detect_wall[q_y + 1][q_x + 0]
                     && !borg_detect_wall[q_y + 1][q_x + 1]
                     && borg_fear_region[borg.c.y / 11][borg.c.x / 11]
-                    < avoidance / 20) {
+                    < borg.avoidance / 20) {
                     break;
                 }
             }
@@ -1984,7 +1985,7 @@ static int borg_launch_arc_at_location(
                 /* Collect damage, lowered by distance */
                 n += borg_launch_bolt_aux_hack(ag->kill, dam / (r + 1), typ, 0);
 
-            if (ag->take && borg_takes[ag->take].kind)
+            if (ag->take && borg_takes[ag->take].kidx)
                 n -= borg_launch_destroy_stuff(ag, typ);
         }
     }
@@ -2218,7 +2219,7 @@ static int borg_attack_aux_rest(void)
             continue;
 
         /* need to have seen it recently */
-        if (borg_t - kill->when > 10)
+        if (borg_timer(kill->when) > 10)
             continue;
 
         /* Skip monsters that dont chase */
@@ -2315,7 +2316,7 @@ static int borg_attack_aux_object(void)
 
         /* Save last flasks for fuel, if needed */
         if (item->tval == TV_FLASK
-            && (borg.trait[BI_AFUEL] <= 1 && !borg_fighting_unique))
+            && (borg.trait[BI_AFUEL] <= 1 && !borg.near.unique))
             continue;
 
         /* Dont throw wands or rods */
@@ -2385,8 +2386,8 @@ static int borg_attack_aux_object(void)
  *
  * Take into account the failure rate of spells/objects/etc.  XXX XXX XXX
  */
-int borg_attack_aux_spell_bolt(
-    const enum borg_spells spell, int rad, int dam, int typ, int max_range, bool is_arc)
+int borg_attack_aux_spell_bolt(const enum borg_spells spell, int rad, int dam,
+    int typ, int max_range, bool is_arc)
 {
     int b_n;
     int penalty = 0;
@@ -2412,7 +2413,7 @@ int borg_attack_aux_spell_bolt(
         return 0;
 
     /* Require ability (right now) */
-    if (!borg_spell_okay_fail(spell, (borg_fighting_unique ? 40 : 25)))
+    if (!borg_spell_okay_fail(spell, (borg.near.unique ? 40 : 25)))
         return 0;
 
     /* Choose optimal location */
@@ -2546,7 +2547,7 @@ static int borg_attack_aux_spell_bolt_reserve(
         return 0;
 
     /* Must be dangerous */
-    if (borg_danger(borg.c.y, borg.c.x, 1, true, false) < avoidance * 2)
+    if (borg_danger(borg.c.y, borg.c.x, 1, true, false) < borg.avoidance * 2)
         return 0;
 
     /* Find the monster */
@@ -2866,7 +2867,7 @@ static int borg_attack_aux_wand_bolt(
         /* check the danger */
         if (b_n > 0
             && borg_danger(borg.c.y, borg.c.x, 1, true, false)
-                   >= (avoidance * 7 / 10)) {
+                   >= (borg.avoidance * 7 / 10)) {
             /* make the wand appear deadly */
             b_n = 999;
 
@@ -3191,7 +3192,7 @@ static int borg_attack_aux_whirlwind_attack(void)
 
     /* Can I do it */
     if (!borg_spell_okay_fail(
-            WHIRLWIND_ATTACK, (borg_fighting_unique ? 40 : 25)))
+            WHIRLWIND_ATTACK, (borg.near.unique ? 40 : 25)))
         return 0;
 
     /* int original_danger = borg_danger(borg.c.y, borg.c.x, 1, false, false);
@@ -3228,7 +3229,7 @@ static int borg_attack_aux_whirlwind_attack(void)
             /* Calculate danger */
             p = borg_danger_one_kill(y, x, 1, ag->kill, true, true);
 
-            if (p > avoidance * 2)
+            if (p > borg.avoidance * 2)
                 continue;
         }
 
@@ -3277,7 +3278,7 @@ static int borg_attack_aux_leap_into_battle(void)
 
     /* Can I do it */
     if (!borg_spell_okay_fail(
-            LEAP_INTO_BATTLE, (borg_fighting_unique ? 40 : 25)))
+            LEAP_INTO_BATTLE, (borg.near.unique ? 40 : 25)))
         return 0;
 
     /* Too afraid to attack */
@@ -3326,7 +3327,7 @@ static int borg_attack_aux_leap_into_battle(void)
             /* Calculate danger */
             p = borg_danger_one_kill(y, x, 1, ag->kill, true, true);
 
-            if (p > avoidance * 2)
+            if (p > borg.avoidance * 2)
                 continue;
         }
 
@@ -3410,7 +3411,7 @@ static int borg_attack_aux_maim_foe(void)
         return 0;
 
     /* Can I do it */
-    if (!borg_spell_okay_fail(MAIM_FOE, (borg_fighting_unique ? 40 : 25)))
+    if (!borg_spell_okay_fail(MAIM_FOE, (borg.near.unique ? 40 : 25)))
         return 0;
 
     blows = borg.trait[BI_CLEVEL] / 15;
@@ -3446,7 +3447,7 @@ static int borg_attack_aux_maim_foe(void)
             /* Calculate danger */
             p = borg_danger_one_kill(y, x, 1, ag->kill, true, true);
 
-            if (p > avoidance * 2)
+            if (p > borg.avoidance * 2)
                 continue;
         }
 
@@ -3516,7 +3517,7 @@ static int borg_attack_aux_vampire_strike(void)
     borg_kill *kill;
 
     /* Can I do it */
-    if (!borg_spell_okay_fail(VAMPIRE_STRIKE, (borg_fighting_unique ? 40 : 25)))
+    if (!borg_spell_okay_fail(VAMPIRE_STRIKE, (borg.near.unique ? 40 : 25)))
         return 0;
 
     /* Examine possible destinations */
@@ -3596,7 +3597,7 @@ static int borg_attack_aux_vampire_strike(void)
         /* Calculate danger */
         p = borg_danger_one_kill(y, x, 1, ag->kill, true, true);
 
-        if (p > avoidance * 2)
+        if (p > borg.avoidance * 2)
             return 0;
     }
 
@@ -5184,7 +5185,7 @@ bool borg_attack(bool boosted_bravery)
             continue;
 
         /* Require current knowledge */
-        if (kill->when < borg_t - 2)
+        if (borg_timer(kill->when) > 2)
             continue;
 
         /* Ignore multiplying monsters and when fleeing from scaries*/
@@ -5211,15 +5212,15 @@ bool borg_attack(bool boosted_bravery)
             adjacent_monster = true;
 
         /* no attacking most scaryguys, try to get off the level */
-        if (scaryguy_on_level) {
+        if (borg.mon.scary) {
             /* probably Grip or Fang. */
             if (strstr(r_ptr->name, "Grip") || strstr(r_ptr->name, "Fang")) {
                 /* Try to fight Grip and Fang. */
             } else if (borg.trait[BI_CDEPTH] <= 5 && borg.trait[BI_CDEPTH] != 0
                        && (rf_has(r_info[kill->r_idx].flags, RF_MULTIPLY))) {
                 /* Try to fight single worms and mice. */
-            } else if (borg_t - borg_began >= 2000
-                       || borg_time_town + (borg_t - borg_began) >= 3000) {
+            } else if (borg_timer(borg.time.level) >= 2000
+                       || (borg_timer(borg.time.town)) >= 3000) {
                 /* Try to fight been there too long. */
             } else if (boosted_bravery || borg.no_retreat >= 1
                        || borg.goal.recalling || borg.goal.descending) {

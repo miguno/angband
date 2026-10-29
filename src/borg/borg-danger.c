@@ -32,6 +32,7 @@
 #include "borg-flow-kill.h"
 #include "borg-magic.h"
 #include "borg-projection.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg.h"
 
@@ -520,7 +521,7 @@ static int borg_danger_physical(int i, bool full_damage)
         if (!full_damage) {
             /* figure out chance that monster will hit you. */
             /* add a 50% bonus in to account for bad luck. */
-            if (borg_fighting_unique || (r_ptr->level + power) > 0)
+            if (borg.near.unique || (r_ptr->level + power) > 0)
                 chance
                     = 150
                       - (((ac * 300) / 4) / 1 + ((r_ptr->level + power) * 3));
@@ -1489,7 +1490,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -1497,7 +1498,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 3;
                 p = p / spot_safe;
             } else {
@@ -1536,7 +1537,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -1544,7 +1545,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 6;
                 p = p / spot_safe;
             } else {
@@ -1582,12 +1583,12 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
-            if (pfe || glyph || borg_create_door || borg_fighting_unique)
+            if (pfe || glyph || borg_create_door || borg.near.unique)
                 p += 0;
             else {
                 p += (r_ptr->spell_power) * 5;
@@ -1621,12 +1622,12 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
-            if (pfe || glyph || borg_create_door || borg_fighting_unique)
+            if (pfe || glyph || borg_create_door || borg.near.unique)
                 p += 0;
             else {
                 p += (r_ptr->spell_power) * 7;
@@ -1663,12 +1664,12 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
-            if (pfe || glyph || borg_create_door || borg_fighting_unique)
+            if (pfe || glyph || borg_create_door || borg.near.unique)
                 p += 0;
             else {
                 p += (r_ptr->spell_power) * 5;
@@ -1705,12 +1706,12 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
-            if (pfe || glyph || borg_create_door || borg_fighting_unique)
+            if (pfe || glyph || borg_create_door || borg.near.unique)
                 p += 0;
             else {
                 p += (r_ptr->spell_power) * 5;
@@ -1747,12 +1748,12 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
-            if (pfe || glyph || borg_create_door || borg_fighting_unique)
+            if (pfe || glyph || borg_create_door || borg.near.unique)
                 p += 0;
             else {
                 p += (r_ptr->spell_power) * 5;
@@ -1789,7 +1790,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -1797,7 +1798,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 2;
                 p = p / spot_safe;
             } else {
@@ -1835,15 +1836,15 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
-            if (pfe || borg_fighting_unique) {
+            if (pfe || borg.near.unique) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 3;
                 p = p / spot_safe;
             } else {
@@ -1881,7 +1882,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -1889,7 +1890,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 3;
                 p = p / spot_safe;
             } else {
@@ -1927,7 +1928,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -1935,7 +1936,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 3;
                 p = p / spot_safe;
             } else {
@@ -1973,7 +1974,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -1981,7 +1982,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 3;
                 p = p / spot_safe;
             } else {
@@ -2019,7 +2020,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -2027,7 +2028,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 6;
                 p = p / spot_safe;
             } else {
@@ -2065,14 +2066,14 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
             }
             if (pfe) {
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 6;
                 p = p / spot_safe;
             } else {
@@ -2110,7 +2111,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -2118,7 +2119,7 @@ static int borg_danger_spell(
             if (pfe) {
                 p += (r_ptr->spell_power);
                 p = p / spot_safe;
-            } else if (glyph || borg_create_door || borg_fighting_unique) {
+            } else if (glyph || borg_create_door || borg.near.unique) {
                 p += (r_ptr->spell_power) * 6;
                 p = p / spot_safe;
             } else {
@@ -2156,7 +2157,7 @@ static int borg_danger_spell(
                             spot_safe = 1;
                         if (spot_safe == 8)
                             spot_safe = 100;
-                        if (borg_morgoth_position || borg_as_position)
+                        if (borg.morgoth_position || borg.status.anti_summon)
                             spot_safe = 1000;
                     }
                 }
@@ -2210,7 +2211,7 @@ static int borg_danger_spell(
     /* Slightly decrease the danger if the borg is sitting in
      * a sea of runes.
      */
-    if (borg_morgoth_position || borg_as_position)
+    if (borg.morgoth_position || borg.status.anti_summon)
         total_dam = total_dam * 7 / 10;
 
     /* Average damage of all the spells & compare to most dangerous spell */
@@ -2345,7 +2346,7 @@ int borg_danger_one_kill(
 
     /* A very speedy borg will miscalculate danger of some monsters */
     if (borg.trait[BI_SPEED] >= 135)
-        fake_speed = (borg_fighting_unique ? 120 : 125);
+        fake_speed = (borg.near.unique ? 120 : 125);
 
     /* Consider the character haste and slow monster spells */
     if (borg.temp.fast)
@@ -2398,13 +2399,12 @@ int borg_danger_one_kill(
     /* Physical attacks */
     v1 = borg_danger_physical(i, full_damage);
 
-    /* If the Borg has been stuck on this panel for a long time, or if the
-     * total turn count is very high, reduce the danger value. This helps
-     * prevent the Borg from getting stuck due to overestimating danger and
-     * refusing to move in both this area of the dungeon and over the course
-     * of the game.
+    /* If the Borg has been bouncing for a long time, or if the time this
+     * level is very high, reduce the danger value. This helps prevent the
+     * borg from getting stuck due to overestimating danger and refusing to
+     * move in both this area of the dungeon and over the course of the game.
      */
-    if (borg.time_this_panel > 1200 || borg_t > 25000) {
+    if (borg.antibounce_count > 1200 || borg_timer(borg.time.level) > 25000) {
         v1 = v1 / 5;
     }
 
@@ -2689,13 +2689,12 @@ int borg_danger_one_kill(
         v2 = b_v2;
     }
 
-    /* If the Borg has been stuck on this panel for a long time, or if the
-     * total turn count is very high, reduce the danger value. This helps
-     * prevent the Borg from getting stuck due to overestimating danger and
-     * refusing to move in both this area of the dungeon and over the course
-     * of the game.
+    /* If the Borg has been bouncing for a long time, or if the time this
+     * level is very high, reduce the danger value. This helps prevent the
+     * borg from getting stuck due to overestimating danger and refusing to
+     * move in both this area of the dungeon and over the course of the game.
      */
-    if (borg.time_this_panel > 1200 || borg_t > 25000) {
+    if (borg.antibounce_count > 1200 || borg_timer(borg.time.level) > 25000) {
         v2 = v2 / 5;
     }
 
@@ -2841,11 +2840,10 @@ int borg_danger(int y, int x, int c, bool average, bool full_damage)
         p = 300;
 
     /* Added danger (from a lot of monsters).
-     * But do not add it if we have been sitting on
-     * this panel for too long, or monster's in a vault.  The fear_monsters[][]
-     * can induce some bouncy behavior.
+     * But do not add it if we have been bouncing for too long, or monster's
+     * in a vault.  The fear_monsters[][] can induce some bouncy behavior.
      */
-    if (borg.time_this_panel <= 200 && !square_isvault(cave, loc(x, y)))
+    if (borg.antibounce_count <= 200 && !square_isvault(cave, loc(x, y)))
         p += borg_fear_monsters[y][x] * c;
 
     full_damage = true;

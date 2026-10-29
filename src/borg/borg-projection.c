@@ -23,6 +23,7 @@
 
 #include "../cave.h"
 
+#include "borg.h"
 #include "borg-cave-util.h"
 #include "borg-cave.h"
 #include "borg-danger.h"
@@ -256,7 +257,7 @@ bool borg_projectable(int y1, int x1, int y2, int x2)
         ag = &borg_grids[y][x];
 
         if ((borg.trait[BI_CURHP] < borg.trait[BI_MAXHP] / 3
-                || borg_morgoth_position || scaryguy_on_level)) {
+                || borg.morgoth_position || borg.mon.scary)) {
             /* Assume all unknown grids more than distance 20 from you
              * are walls--when I am wounded. This will make me more fearful
              * of the grids that are up to 19 spaces away.  I treat them as
@@ -274,7 +275,7 @@ bool borg_projectable(int y1, int x1, int y2, int x2)
             if ((dist > 10) && (ag->feat == FEAT_NONE))
                 break;
         } else if (borg_fear_region[borg.c.y / 11][borg.c.x / 11]
-                   >= avoidance / 20) {
+                   >= borg.avoidance / 20) {
             /* If a non-LOS monster is attacking me, then it is probably has
              * LOS to me, so do not place walls on unknown grids.  This will
              *allow me the chance to attack monsters.

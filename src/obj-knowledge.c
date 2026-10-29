@@ -1199,7 +1199,7 @@ void player_know_object(struct player *p, struct object *obj)
 
 	/* Fully known objects have their known element and flag info set to 
 	 * match the actual info, rather than showing what elements and flags
-	 * the would be displaying if they had them */
+	 * they would be displaying if they had them */
 	if (object_fully_known(obj)) {
 		for (i = 0; i < ELEM_MAX; i++) {
 			obj->known->el_info[i].res_level = obj->el_info[i].res_level;
@@ -1824,14 +1824,12 @@ void object_learn_on_wield(struct player *p, struct object *obj)
 	char o_name[80];
 
 	assert(obj->known);
-	object_desc(o_name, sizeof(o_name), obj, ODESC_BASE, p);
 
 	/* Check the worn flag */
 	if (obj->known->notice & OBJ_NOTICE_WORN) {
 		return;
-	} else {
-		obj->known->notice |= OBJ_NOTICE_WORN;
 	}
+	obj->known->notice |= OBJ_NOTICE_WORN;
 
 	/* Worn means tried (for flavored wearables) */
 	object_flavor_tried(obj);
@@ -1848,6 +1846,7 @@ void object_learn_on_wield(struct player *p, struct object *obj)
 	}
 
 	/* Learn about obvious, previously unknown flags */
+	object_desc(o_name, sizeof(o_name), obj, ODESC_BASE, p);
 	object_flags(obj, f);
 	of_inter(f, obvious_mask);
 	for (flag = of_next(f, FLAG_START); flag != FLAG_END;

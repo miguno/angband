@@ -33,13 +33,14 @@
 #include "borg-item-val.h"
 #include "borg-magic.h"
 #include "borg-messages-react.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-trait.h"
 #include "borg-update.h"
 #include "borg.h"
 
 /*
  * Check to see if the surrounding dungeon should be darkened
- * This is only done for necromancers 
+ * This is only done for necromancers
  */
 static bool borg_check_dark_only(void)
 {
@@ -51,7 +52,7 @@ static bool borg_check_dark_only(void)
 
     /* Don't bother because we only just did it */
     /* necromancers borrow the call light counter for darkness */
-    if (borg.when_call_light != 0 && (borg_t - borg.when_call_light) < 7)
+    if (borg.time.call_light != 0 && (borg_timer(borg.time.call_light) < 7))
         return false;
     int x, y;
     int floors = 0;
@@ -71,7 +72,7 @@ static bool borg_check_dark_only(void)
             ag = &borg_grids[y][x];
 
             /* Must be a glowing floor grid */
-            if (borg_cave_floor_grid(ag) 
+            if (borg_cave_floor_grid(ag)
                 && square_isglow(cave, loc(x, y))) {
                 floors++;
             }
@@ -85,7 +86,7 @@ static bool borg_check_dark_only(void)
 
     if (borg_spell_fail(CREATE_DARKNESS, 40)) {
         borg_note("# Calling Darkness in the dungeon");
-        borg.when_call_light = borg_t;
+        borg.time.call_light = borg.time.now;
         return true;
     }
 
@@ -114,14 +115,14 @@ bool borg_check_light_only(void)
         return false;
 
     /** Use wizard light sometimes **/
-    if (!borg.when_wizard_light || (borg_t - borg.when_wizard_light >= 1000)) {
+    if (!borg.time.wizard_light
+        || (borg_timer(borg.time.wizard_light) >= 1000)) {
         if (borg_activate_item(act_clairvoyance)
             || borg_activate_item(act_enlightenment)
             || borg_spell_fail(FUME_OF_MORDOR, 40)
             || borg_spell_fail(CLAIRVOYANCE, 40)) {
             borg_note("# Wizard lighting the dungeon");
-            /* borg_react("SELF:wizard lite", "SELF:wizard lite"); */
-            borg.when_wizard_light = borg_t;
+            borg.time.wizard_light = borg.time.now;
             return true;
         }
     }
@@ -133,7 +134,7 @@ bool borg_check_light_only(void)
     /** Work out if there's any reason to light */
 
     /* Don't bother because we only just did it */
-    if (borg.when_call_light != 0 && (borg_t - borg.when_call_light) < 7)
+    if (borg.time.call_light != 0 && (borg_timer(borg.time.call_light) < 7))
         return false;
 
     if (borg.trait[BI_LIGHT] == 1) {
@@ -219,16 +220,16 @@ bool borg_check_light_only(void)
     }
 
     /* Light it up! */
-    if (borg_activate_item(act_illumination) 
+    if (borg_activate_item(act_illumination)
         || borg_activate_item(act_light)
-        || borg_zap_rod(sv_rod_illumination) 
+        || borg_zap_rod(sv_rod_illumination)
         || borg_use_staff(sv_staff_light)
-        || borg_read_scroll(sv_scroll_light) 
+        || borg_read_scroll(sv_scroll_light)
         || borg_spell_fail(LIGHT_ROOM, 40)
         || borg_spell_fail(CALL_LIGHT, 40)) {
         borg_note("# Illuminating the dungeon");
         borg_react("SELF:lite", "SELF:lite");
-        borg.when_call_light = borg_t;
+        borg.time.call_light = borg.time.now;
         return true;
     }
 
@@ -262,11 +263,11 @@ bool borg_check_light(void)
         return false;
 
     /* Never when compromised, save your mana */
-    if (borg.trait[BI_ISBLIND] 
+    if (borg.trait[BI_ISBLIND]
         || borg.trait[BI_ISCONFUSED]
-        || borg.trait[BI_ISIMAGE] 
+        || borg.trait[BI_ISIMAGE]
         || borg.trait[BI_ISPOISONED]
-        || borg.trait[BI_ISCUT] 
+        || borg.trait[BI_ISCUT]
         || borg.trait[BI_ISWEAK])
         return false;
 
@@ -382,26 +383,28 @@ bool borg_check_light(void)
 
     /* Find traps and doors and evil*/
     if ((do_trap || do_door || do_evil)
-        && ((!borg.when_detect_traps || (borg_t - borg.when_detect_traps >= 5))
-            || (!borg.when_detect_evil || (borg_t - borg.when_detect_evil >= 5))
-            || (!borg.when_detect_doors
-                || (borg_t - borg.when_detect_doors >= 5)))
+        && ((!borg.time.detect_traps
+                || (borg_timer(borg.time.detect_traps) >= 5))
+            || (!borg.time.detect_evil
+                || (borg_timer(borg.time.detect_evil) >= 5))
+            || (!borg.time.detect_doors
+                || (borg_timer(borg.time.detect_doors) >= 5)))
         && borg.trait[BI_CDEPTH]) /* Never in town */
     {
 
         /* Check for traps and doors and evil*/
         if (borg_activate_item(act_detect_all)
-            || borg_activate_item(act_mapping) 
+            || borg_activate_item(act_mapping)
             || borg_zap_rod(sv_rod_detection)
             || borg_spell_fail(SENSE_SURROUNDINGS, 40)) {
             borg_note("# Checking for traps, doors, and evil.");
 
             borg_react("SELF:TDE", "SELF:TDE");
 
-            borg.when_detect_traps = borg_t;
-            borg.when_detect_doors = borg_t;
-            borg.when_detect_evil  = borg_t;
-            borg.when_detect_obj   = borg_t;
+            borg.time.detect_traps = borg.time.now;
+            borg.time.detect_doors = borg.time.now;
+            borg.time.detect_evil  = borg.time.now;
+            borg.time.detect_obj   = borg.time.now;
 
             return true;
         }
@@ -409,7 +412,8 @@ bool borg_check_light(void)
 
     /* Find evil */
     if (do_evil
-        && (!borg.when_detect_evil || (borg_t - borg.when_detect_evil >= 20))) {
+        && (!borg.time.detect_evil
+            || (borg_timer(borg.time.detect_evil) >= 20))) {
         /* Check for evil */
         if (borg_spell_fail(DETECT_EVIL, 40)
             || borg_spell_fail(DETECT_MONSTERS, 40)
@@ -419,7 +423,7 @@ bool borg_check_light(void)
 
             borg_react("SELF:evil", "SELF:evil");
 
-            borg.when_detect_evil = borg_t;
+            borg.time.detect_evil = borg.time.now;
 
             return true;
         }
@@ -427,14 +431,15 @@ bool borg_check_light(void)
 
     /* Find traps and doors (and stairs) */
     if ((do_trap || do_door)
-        && ((!borg.when_detect_traps || (borg_t - borg.when_detect_traps >= 5))
-            || (!borg.when_detect_doors
-                || (borg_t - borg.when_detect_doors >= 5)))
+        && ((!borg.time.detect_traps
+                || (borg_timer(borg.time.detect_traps) >= 5))
+            || (!borg.time.detect_doors
+                || (borg_timer(borg.time.detect_doors) >= 5)))
         && borg.trait[BI_CDEPTH]) /* Never in town */
     {
         /* Check for traps and doors */
         if (borg_activate_item(act_detect_all)
-            || borg_activate_item(act_mapping) 
+            || borg_activate_item(act_mapping)
             || borg_spell_fail(DETECTION, 40)
             || borg_spell_fail(FIND_TRAPS_DOORS_STAIRS, 40)
             || borg_spell_fail(DETECT_STAIRS, 40)) {
@@ -442,8 +447,8 @@ bool borg_check_light(void)
 
             borg_react("SELF:both", "SELF:both");
 
-            borg.when_detect_traps = borg_t;
-            borg.when_detect_doors = borg_t;
+            borg.time.detect_traps = borg.time.now;
+            borg.time.detect_doors = borg.time.now;
 
             return true;
         }
@@ -451,7 +456,8 @@ bool borg_check_light(void)
 
     /* Find traps */
     if (do_trap
-        && (!borg.when_detect_traps || (borg_t - borg.when_detect_traps >= 7))
+        && (!borg.time.detect_traps
+            || (borg_timer(borg.time.detect_traps) >= 7))
         && borg.trait[BI_CDEPTH]) /* Never in town */
     {
         /* Check for traps */
@@ -461,7 +467,7 @@ bool borg_check_light(void)
 
             borg_react("SELF:trap", "SELF:trap");
 
-            borg.when_detect_traps = borg_t;
+            borg.time.detect_traps = borg.time.now;
 
             return true;
         }
@@ -469,7 +475,7 @@ bool borg_check_light(void)
 
     /* Find doors */
     if (do_door
-        && (!borg.when_detect_doors || (borg_t - borg.when_detect_doors >= 9))
+        && (!borg.time.detect_doors || (borg_timer(borg.time.detect_doors) >= 9))
         && borg.trait[BI_CDEPTH]) /* Never in town */
     {
         /* Check for traps */
@@ -480,7 +486,7 @@ bool borg_check_light(void)
 
             borg_react("SELF:door", "SELF:door");
 
-            borg.when_detect_doors = borg_t;
+            borg.time.detect_doors = borg.time.now;
 
             return true;
         }
@@ -488,7 +494,8 @@ bool borg_check_light(void)
 
     /* Find walls */
     if (do_wall
-        && (!borg.when_detect_walls || (borg_t - borg.when_detect_walls >= 15))
+        && (!borg.time.detect_walls
+            || (borg_timer(borg.time.detect_walls) >= 15))
         /* Never in town */
         && borg.trait[BI_CDEPTH]) {
         /* Check for walls */
@@ -502,7 +509,7 @@ bool borg_check_light(void)
 
             borg_react("SELF:wall", "SELF:wall");
 
-            borg.when_detect_walls = borg_t;
+            borg.time.detect_walls = borg.time.now;
 
             /*
              * Clear the BORG_IGNORE_MAP flag:  immediately after detection
@@ -520,7 +527,8 @@ bool borg_check_light(void)
 
     /* Find objects */
     if (do_obj
-        && (!borg.when_detect_obj || (borg_t - borg.when_detect_obj >= 20))) {
+        && (!borg.time.detect_obj
+            || (borg_timer(borg.time.detect_obj) >= 20))) {
         /* Check for objects */
         if (borg_activate_item(act_detect_objects)
             || borg_spell_fail(OBJECT_DETECTION, 40)) {
@@ -528,7 +536,7 @@ bool borg_check_light(void)
 
             borg_react("SELF:obj", "SELF:obj");
 
-            borg.when_detect_obj = borg_t;
+            borg.time.detect_obj = borg.time.now;
 
             return true;
         }
@@ -678,7 +686,6 @@ bool borg_light_beam(bool simulation)
     bool spell_ok = false;
     int  i;
     bool blocked  = false;
-    bool bold     = false;
 
     borg_grid *ag = &borg_grids[borg.c.y][borg.c.x];
 
@@ -699,16 +706,14 @@ bool borg_light_beam(bool simulation)
     if (borg.c.y - borg.trait[BI_LIGHT] - 1 > 0) {
         /* Look just beyond my light */
         ag = &borg_grids[borg.c.y - borg.trait[BI_LIGHT] - 1][borg.c.x];
-        bold = borg_cave_floor_bold(
-            borg.c.y - borg.trait[BI_LIGHT] - 1, borg.c.x);
 
         /* Must be on the panel */
         if (panel_contains(borg.c.y - borg.trait[BI_LIGHT] - 1, borg.c.x)) {
             /* Check each grid in our light radius along the course */
             for (i = 0; i <= borg.trait[BI_LIGHT]; i++) {
-                if (borg_cave_floor_bold(borg.c.y - i, borg.c.x) && !bold
-                    && ag->feat < FEAT_SECRET && ag->feat != FEAT_CLOSED
-                    && blocked == false) {
+                if ((borg_cave_floor_bold(borg.c.y - i, borg.c.x) ||
+                    borg_grids[borg.c.y - i][borg.c.x].feat == FEAT_NONE)
+                    && ag->feat == FEAT_NONE && blocked == false) {
                     /* note the direction */
                     dir = 8;
                 } else {
@@ -727,17 +732,15 @@ bool borg_light_beam(bool simulation)
         blocked = false;
         /* Look just beyond my light */
         ag = &borg_grids[borg.c.y + borg.trait[BI_LIGHT] + 1][borg.c.x];
-        bold = borg_cave_floor_bold(
-            borg.c.y + borg.trait[BI_LIGHT] + 1, borg.c.x);
 
         /* Must be on the panel */
         if (panel_contains(borg.c.y + borg.trait[BI_LIGHT] + 1, borg.c.x)) {
             /* Check each grid in our light radius along the course */
             for (i = 0; i <= borg.trait[BI_LIGHT]; i++) {
                 /* all floors */
-                if (borg_cave_floor_bold(borg.c.y + i, borg.c.x) && !bold
-                    && ag->feat < FEAT_SECRET && ag->feat != FEAT_CLOSED
-                    && blocked == false) {
+                if ((borg_cave_floor_bold(borg.c.y + i, borg.c.x)
+                        || borg_grids[borg.c.y + i][borg.c.x].feat == FEAT_NONE)
+                    && ag->feat == FEAT_NONE && blocked == false) {
                     /* note the direction */
                     dir = 2;
                 } else {
@@ -756,17 +759,16 @@ bool borg_light_beam(bool simulation)
         blocked = false;
         /* Look just beyond my light */
         ag = &borg_grids[borg.c.y][borg.c.x + borg.trait[BI_LIGHT] + 1];
-        bold = borg_cave_floor_bold(
-            borg.c.y, borg.c.x + borg.trait[BI_LIGHT] + 1);
 
         /* Must be on the panel */
         if (panel_contains(borg.c.y, borg.c.x + borg.trait[BI_LIGHT] + 1)) {
             /* Check each grid in our light radius along the course */
             for (i = 0; i <= borg.trait[BI_LIGHT]; i++) {
                 /* all floors */
-                if (borg_cave_floor_bold(borg.c.y, borg.c.x + i) && !bold
-                    && ag->feat < FEAT_SECRET && ag->feat != FEAT_CLOSED
-                    && blocked == false) {
+                if ((borg_cave_floor_bold(borg.c.y, borg.c.x + i)
+                        || borg_grids[borg.c.y][borg.c.x + i].feat
+                               == FEAT_NONE)
+                    && ag->feat == FEAT_NONE && blocked == false) {
                     /* note the direction */
                     dir = 6;
                 } else {
@@ -785,8 +787,6 @@ bool borg_light_beam(bool simulation)
         blocked = false;
         /* Look just beyond my light */
         ag   = &borg_grids[borg.c.y][borg.c.x - borg.trait[BI_LIGHT] - 1];
-        bold = borg_cave_floor_bold(
-            borg.c.y, borg.c.x - borg.trait[BI_LIGHT] - 1);
 
         /* Must be on the panel */
         if (panel_contains(borg.c.y, borg.c.x - borg.trait[BI_LIGHT] - 1)) {
@@ -795,9 +795,9 @@ bool borg_light_beam(bool simulation)
                 /* Verify that there are no blockers in my light radius and
                  * the 1st grid beyond my light is not a floor nor a blocker
                  */
-                if (borg_cave_floor_bold(borg.c.y, borg.c.x - i) && !bold
-                    && ag->feat < FEAT_SECRET && ag->feat != FEAT_CLOSED
-                    && blocked == false) {
+                if ((borg_cave_floor_bold(borg.c.y, borg.c.x - i)
+                      || borg_grids[borg.c.y][borg.c.x - i].feat == FEAT_NONE)
+                    && ag->feat == FEAT_NONE && blocked == false) {
                     /* note the direction */
                     dir = 4;
                 } else {
@@ -811,25 +811,10 @@ bool borg_light_beam(bool simulation)
 
     /* Don't do it if on the edge of shifting the panel. */
     if (dir == 5 || spell_ok == false || blocked == true
-// !FIX !TODO make sure these panel edge checks are right.
         || (dir == 2
-            && (borg.c.y == 18 
-                || borg.c.y == 19 
-                || borg.c.y == 29
-                || borg.c.y == 30 
-                || borg.c.y == 40 
-                || borg.c.y == 41
-                || borg.c.y == 51 
-                || borg.c.y == 52))
+            && (borg.c.y > borg_panel_hgt() - 2))
         || (dir == 8
-            && (borg.c.y == 13 
-                || borg.c.y == 14 
-                || borg.c.y == 24
-                || borg.c.y == 25 
-                || borg.c.y == 35 
-                || borg.c.y == 36
-                || borg.c.y == 46 
-                || borg.c.y == 47)))
+            && (borg.c.y > borg_panel_hgt() - 2)))
         return false;
 
     /* simulation */

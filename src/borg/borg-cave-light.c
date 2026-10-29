@@ -21,12 +21,10 @@
 
 #ifdef ALLOW_BORG
 
-#include "../cave.h"
-
+#include "borg.h"
 #include "borg-cave-util.h"
 #include "borg-cave-view.h"
 #include "borg-cave.h"
-#include "borg-projection.h"
 #include "borg-trait.h"
 
 /*

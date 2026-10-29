@@ -40,14 +40,15 @@
 #include "borg-inventory.h"
 #include "borg-io.h"
 #include "borg-item-wear.h"
-#include "borg-junk.h"
 #include "borg-messages.h"
 #include "borg-prepared.h"
 #include "borg-projection.h"
+#include "borg-reincarnate.h"
 #include "borg-store-buy.h"
 #include "borg-store-sell.h"
 #include "borg-store.h"
 #include "borg-think-dungeon.h"
+#include "borg-think-dungeon-util.h"
 #include "borg-think.h"
 #include "borg-trait.h"
 #include "borg.h"
@@ -79,11 +80,14 @@ bool borg_failure; /* Notice failure */
 /*
  * The detection arrays
  */
-bool borg_detect_wall[6][18];
-bool borg_detect_trap[6][18];
-bool borg_detect_door[6][18];
-bool borg_detect_evil[6][18];
-bool borg_detect_obj[6][18];
+bool **borg_detect_wall = NULL;
+bool **borg_detect_trap = NULL;
+bool **borg_detect_door = NULL;
+bool **borg_detect_evil = NULL;
+bool **borg_detect_obj = NULL;
+
+/* panel count tracking */
+static struct loc old_panels = { -1, -1 };
 
 #if 0
 /*
@@ -321,6 +325,8 @@ static void borg_update_map(void)
                 track_shop_x[i] = x;
                 track_shop_y[i] = y;
 
+            /* this checks that the trap is visible so it isn't really */
+            /* a cheat of any information the borg couldn't get another way*/
             } else if (square_isdisarmabletrap(cave, l)) {
                 /* Minor cheat for the borg.  If the borg is running
                  * in the graphics mode (not the AdamBolt Tiles) he will
@@ -394,6 +400,10 @@ static void borg_update_map(void)
                  * grid information from the game rather than from
                  * his memory.  He is going to see if the wall is perm.
                  * This is a cheat. May the Lord have mercy on my soul.
+                 * AJG note: not so bad.  Look could have given this
+                 * information. Just because it isn't visually called out
+                 * in non-graphics char sets doesn't mean the info isn't
+                 * available.
                  *
                  * The only other option is to have him "dig" on each
                  * and every granite wall to see if it is perm.  Then he
@@ -408,16 +418,16 @@ static void borg_update_map(void)
                  * and not before level 50 or whatever.
                  *
                  * Since the code to dig slows the borg down a lot.
-                 * (Found in borg6.c in _flow_dark_interesting()) We will
-                 * limit his capacity to search.  We will set a flag on
+                 * (Found in borg-flow-dark.c in _flow_dark_interesting()) We
+                 * will limit his capacity to search.  We will set a flag on
                  * the level is perma grids are found.
                  */
-                /* is it a perma grid?  Only counts for being a vault if not in
-                 * town */
-                /* and not on edge of map */
+                /* is it a perma grid?  Only counts for being a vault if not *
+                 * in town *
+                 * and not on edge of map */
                 if (ag->feat == FEAT_PERM && borg.trait[BI_CDEPTH] && x && y
                     && x != (cave->width - 1) && y != (cave->height - 1)) {
-                    vault_on_level = true;
+                    borg.status.vault = true;
                 }
             }
             /* lava */
@@ -532,12 +542,13 @@ static void borg_update_map(void)
             if (ag->feat == FEAT_FLOOR && square_iswebbed(cave, l)) {
                 ag->web = true;
             } else
-                ag->web = false;          
+                ag->web = false;
 
             /* Now do non-feature stuff */
             if ((g.first_kind || g.m_idx) && !borg.trait[BI_ISIMAGE]) {
                 /* Monsters/Objects */
                 borg_wank *wank;
+                bool is_mimic = false;
 
                 /* Check for memory overflow */
                 if (borg_wank_num == AUTO_VIEW_MAX) {
@@ -562,12 +573,18 @@ static void borg_update_map(void)
                     struct monster *m_ptr = cave_monster(cave, g.m_idx);
                     wank->t_a             = m_ptr->attr;
                     wank->t_c             = r_info[m_ptr->race->ridx].d_char;
+
+                    /* HACK Check if the monster is a mimic.  The borg */
+                    /* shouldn't auto-know what is and isn't a mimic */
+                    if (m_ptr->mimicked_obj && m_ptr->m_timed[MON_TMD_SLEEP]) {
+                        is_mimic = true;
+                    }
                 } else {
                     wank->t_a = g.first_kind->d_attr;
                     wank->t_c = g.first_kind->d_char;
                 }
-                wank->is_take = (g.first_kind != NULL);
-                wank->is_kill = (g.m_idx != 0);
+                wank->is_take = (g.first_kind != NULL) || is_mimic;
+                wank->is_kill = (g.m_idx != 0) && !is_mimic;
             }
 
             /* Save the new "wall" or "door" */
@@ -592,6 +609,11 @@ static void borg_update_map(void)
                 /* Recalculate the lite (if needed) */
                 if (ag->info & BORG_LIGHT)
                     borg_do_update_lite = true;
+
+                /* if the walls have changed we should */
+                /* detect again */
+                borg.time.wizard_light = 0;
+                borg.time.detect_walls = 0;
             }
         }
     }
@@ -622,7 +644,7 @@ static void borg_fear_grid(int y, int x, int k)
         return;
 
     /* In a Sea of Runes, no worry */
-    if (borg_morgoth_position || borg_as_position)
+    if (borg.morgoth_position || borg.status.anti_summon)
         return;
 
     /* Do not add fear in a vault -- Cheating the cave info */
@@ -725,7 +747,7 @@ static void borg_fear_regional(
     /* Nearby regions */
     y1 = (y0 > 0) ? (y0 - 1) : 0;
     x1 = (x0 > 0) ? (x0 - 1) : 0;
-    y2 = (x0 < 5) ? (x0 + 1) : 5;
+    y2 = (y0 < 5) ? (y0 + 1) : 5;
     x2 = (x0 < 17) ? (x0 + 1) : 17;
 
     /* Collect "fear", spread around */
@@ -1516,7 +1538,7 @@ static int intcomp(const void *a, const void *b)
  */
 void borg_update(void)
 {
-    int          i, ii, k, x, y, dx, dy;
+    int          i, ii, k, x, y, max_x, max_y, dx, dy;
     unsigned int u_i;
 
     int hit_dist;
@@ -1535,6 +1557,32 @@ void borg_update(void)
     bool monster_in_vault = false;
     bool created_traps    = false;
 
+    /*** cheat the panel information ***/
+    w_y = Term->offset_y;
+    w_x = Term->offset_x;
+
+    /* get the current panel count */
+    borg.panels.x = 1;
+    if (cave->width > borg_panel_wid())
+        borg.panels.x
+            = ((((cave->width - borg_panel_wid()) * 2) / borg_panel_wid())) + 1;
+
+    borg.panels.y = 1;
+    if (cave->height > borg_panel_hgt())
+        borg.panels.y
+            = ((((cave->height - borg_panel_hgt()) * 2) / borg_panel_hgt()))
+              + 1;
+
+    /* if the old panel info is larger than the cave, reset it */
+    /* this can happen if the player changes levels while there are messages */
+    /* waiting to be processed */
+    if (o_w_x > cave->width || o_w_y > cave->height) {
+        o_w_x = o_w_y = 0;
+    }
+
+    /* allocate the detection arrays */
+    borg_alloc_detection();
+
     /*** Process objects/monsters ***/
 
     /* Scan monsters */
@@ -1550,7 +1598,7 @@ void borg_update(void)
         kill->used = false;
 
         /* Skip recently seen monsters */
-        if (borg_t - kill->when < 2000) {
+        if (borg_timer(kill->when) < 2000) {
             /* don't skip if hallucinating unless also afraid */
             /* we don't delete kills in this special case so we don't */
             /* get trapped by monsters we are afraid to attack */
@@ -1571,7 +1619,7 @@ void borg_update(void)
         borg_take *take = &borg_takes[i];
 
         /* Skip dead objects */
-        if (!take->kind)
+        if (!take->kidx)
             continue;
 
         /* Clear flags */
@@ -1588,12 +1636,12 @@ void borg_update(void)
         }
 
         /* Skip recently seen objects */
-        if (borg_t - take->when < 2000)
+        if (borg_timer(take->when) < 2000)
             continue;
 
         /* Note */
         borg_note(format("# Expiring an object '%s' (%lu) at (%d,%d)",
-            (take->kind->name), (unsigned long)take->kind->kidx,
+            (k_info[take->kidx].name), (unsigned long)k_info[take->kidx].kidx,
             take->y, take->x));
 
         /* Kill the object */
@@ -1688,8 +1736,8 @@ void borg_update(void)
 
                 borg_delete_kill(k);
                 borg_msg_use[i] = 2;
-                /* reset the panel.  He's on a roll */
-                borg.time_this_panel = 1;
+                /* reset the anti-bounce count when doing things */
+                borg.antibounce_count = 1;
             }
             /* Shooting through darkness worked */
             if (successful_target < 0)
@@ -1703,8 +1751,8 @@ void borg_update(void)
             if ((k = borg_locate_kill(what, borg.goal.g, 0)) > 0) {
                 borg_delete_kill(k);
                 borg_msg_use[i] = 2;
-                /* reset the panel.  He's on a roll */
-                borg.time_this_panel = 1;
+                /* reset the anti-bounce count when doing things */
+                borg.antibounce_count = 1;
             }
             /* Shooting through darkness worked */
             if (successful_target < 0)
@@ -1718,8 +1766,8 @@ void borg_update(void)
                 borg_count_death(k);
                 borg_delete_kill(k);
                 borg_msg_use[i] = 2;
-                /* reset the panel.  He's on a roll */
-                borg.time_this_panel = 1;
+                /* reset the anti-bounce count when doing things */
+                borg.antibounce_count = 1;
             }
             /* Shooting through darkness worked */
             if (successful_target < 0)
@@ -1830,8 +1878,8 @@ void borg_update(void)
                 borg_count_death(k);
                 borg_delete_kill(k);
                 borg_msg_use[i] = 3;
-                /* reset the panel.  He's on a roll */
-                borg.time_this_panel = 1;
+                /* reset the anti-bounce count when doing things */
+                borg.antibounce_count = 1;
             }
             /* Shooting through darkness worked */
             if (successful_target < 0)
@@ -1844,8 +1892,8 @@ void borg_update(void)
             if ((k = borg_locate_kill(what, borg.goal.g, 1)) > 0) {
                 borg_delete_kill(k);
                 borg_msg_use[i] = 3;
-                /* reset the panel.  He's on a roll */
-                borg.time_this_panel = 1;
+                /* reset the anti-bounce count when doing things */
+                borg.antibounce_count = 1;
             }
             /* Shooting through darkness worked */
             if (successful_target == -1)
@@ -1859,8 +1907,8 @@ void borg_update(void)
                 borg_count_death(k);
                 borg_delete_kill(k);
                 borg_msg_use[i] = 3;
-                /* reset the panel.  He's on a roll */
-                borg.time_this_panel = 1;
+                /* reset the anti-bounce count when doing things */
+                borg.antibounce_count = 1;
             }
             /* Shooting through darkness worked */
             if (successful_target < 0)
@@ -2005,40 +2053,35 @@ void borg_update(void)
     /*** Handle new levels ***/
 
     /* Note new levels */
-    if (old_depth != borg.trait[BI_CDEPTH]) {
-        /* if we are not leaving town increment time since town clock */
-        if (!old_depth)
-            borg_time_town = 0;
-        else
-            borg_time_town += borg_t - borg_began;
-
+    if (borg.status.old_depth != borg.trait[BI_CDEPTH]) {
         /* Restart the clock */
-        borg_t            = 1000;
-        borg_t_morgoth    = 1;
-        borg_t_antisummon = 0;
+        borg.time.level      = borg.time.now;
+        borg.time.morgoth    = 0;
+        borg.time.antisummon = 0;
 
-        /* reset our panel clock */
-        borg.time_this_panel = 1;
+        /* When leaving town, reset the town clock */
+        if (!borg.status.old_depth)
+            borg.time.town = borg.time.now;
+
+        /* reset our anti-bounce count */
+        borg.antibounce_count = 1;
 
         /* reset our vault/unique check */
-        vault_on_level    = false;
-        unique_on_level   = 0;
-        scaryguy_on_level = false;
+        borg.status.vault    = false;
+        borg.mon.unique   = 0;
+        borg.mon.scary = false;
 
         /* reset our breeder flag */
-        breeder_level = false;
+        borg.near.breeder = false;
 
         /* reset our need to see inviso clock */
-        borg.need_see_invis = 1;
+        borg.need_see_invis = 0;
 
         /* reset our 'shoot in the dark' flag */
         successful_target = 0;
 
-        /* When level was begun */
-        borg_began = borg_t;
-
         /* New danger thresh-hold */
-        avoidance = borg.trait[BI_CURHP];
+        borg.avoidance = borg.trait[BI_CURHP];
 
         /* Wipe the danger */
         borg_danger_wipe = true;
@@ -2064,39 +2107,35 @@ void borg_update(void)
         borg_do_update_lite = true;
 
         /* Examine the world */
-        borg_do_inven = true;
-        borg_do_equip = true;
         borg_do_spell = true;
-        borg_do_panel = true;
-        borg_do_frame = true;
 
         /* Enable some functions */
         borg_do_crush_junk = true;
 
         /* Mega-Hack -- Clear "call lite" stamp */
-        borg.when_call_light = 0;
+        borg.time.call_light = 0;
 
         /* Mega-Hack -- Clear "wizard lite" stamp */
-        borg.when_wizard_light = 0;
+        borg.time.wizard_light = 0;
 
         /* Mega-Hack -- Clear "detect traps" stamp */
-        borg.when_detect_traps = 0;
+        borg.time.detect_traps = 0;
 
         /* Mega-Hack -- Clear "detect doors" stamp */
-        borg.when_detect_doors = 0;
+        borg.time.detect_doors = 0;
 
         /* Mega-Hack -- Clear "detect walls" stamp */
-        borg.when_detect_walls = 0;
+        borg.time.detect_walls = 0;
 
         /* Mega-Hack -- Clear DETECT_EVIL stamp */
-        borg.when_detect_evil = 0;
+        borg.time.detect_evil = 0;
 
         /* Mega-Hack -- Clear "detect obj" stamp */
-        borg.when_detect_obj = 0;
+        borg.time.detect_obj = 0;
 
         /* Clear "panel" flags */
-        for (y = 0; y < 6; y++) {
-            for (x = 0; x < 18; x++) {
+        for (y = 0; y < borg.panels.y; y++) {
+            for (x = 0; x < borg.panels.x; x++) {
                 borg_detect_wall[y][x] = false;
                 borg_detect_trap[y][x] = false;
                 borg_detect_door[y][x] = false;
@@ -2105,8 +2144,10 @@ void borg_update(void)
         }
 
         /* Clear "fear" */
-        for (y = 0; y < 6; y++) {
-            for (x = 0; x < 18; x++) {
+		max_x = (AUTO_MAX_X / 11) + 1;
+		max_y = (AUTO_MAX_Y / 11) + 1;
+        for (y = 0; y < max_y; y++) {
+            for (x = 0; x < max_x; x++) {
                 borg_fear_region[y][x] = 0;
             }
         }
@@ -2126,10 +2167,6 @@ void borg_update(void)
 
         /* Clear "shop" goals */
         borg.goal.shop = borg.goal.ware = borg.goal.item = -1;
-
-        /* Reset food&fuel in store */
-        borg_food_onsale = -1;
-        borg_fuel_onsale = -1;
 
         /* Do not use any stairs */
         borg.stair_less = borg.stair_more = false;
@@ -2198,11 +2235,11 @@ void borg_update(void)
         /* Hack- Assume that Morgoth is on Level 100 unless
          * we know he is dead
          */
-        morgoth_on_level = false;
+        borg.near.morgoth = false;
         if ((borg.trait[BI_CDEPTH] >= 100 && !borg.trait[BI_KING])
-            || (unique_on_level == borg_morgoth_id)) {
+            || (borg.mon.unique == borg.id.morgoth)) {
             /* We assume Morgoth is on this level */
-            morgoth_on_level = true;
+            borg.near.morgoth = true;
 
             /* Must build a new sea of runes */
             borg_needs_new_sea = true;
@@ -2308,10 +2345,10 @@ void borg_update(void)
 
         /* save once per level, but not if Lunal Scumming */
         if (borg_cfg[BORG_AUTOSAVE] && !borg.lunal_mode && !borg.munchkin_mode)
-            borg_save = true;
+            borg.status.save = true;
 
         /* Save new depth */
-        old_depth         = borg.trait[BI_CDEPTH];
+        borg.status.old_depth = borg.trait[BI_CDEPTH];
 
         borg.times_twitch = 0;
         borg.escapes      = 0;
@@ -2348,11 +2385,11 @@ void borg_update(void)
 
         /* Hack- Assume that Morgoth is on Level 100
          */
-        morgoth_on_level = false;
+        borg.near.morgoth = false;
         if ((borg.trait[BI_CDEPTH] >= 100 && !borg.trait[BI_KING])
-            || (unique_on_level == borg_morgoth_id)) {
+            || (borg.mon.unique == borg.id.morgoth)) {
             /* We assume Morgoth is on this level */
-            morgoth_on_level = true;
+            borg.near.morgoth = true;
         }
 
         /* If been sitting on level 100 for a long time and Morgoth
@@ -2362,26 +2399,26 @@ void borg_update(void)
          * then assume he is not here so borg can continue to
          * explore the dungeon.
          */
-        if (morgoth_on_level && borg_t - borg_began >= 500) {
+        if (borg.near.morgoth && borg_timer(borg.time.level) >= 500) {
             /* Morgoth is a no show */
-            if (unique_on_level != borg_morgoth_id)
-                morgoth_on_level = false;
+            if (borg.mon.unique != borg.id.morgoth)
+                borg.near.morgoth = false;
 
             /* Morgoth has not been seen in a long time */
-            if (unique_on_level == borg_morgoth_id
-                && (borg_t - borg_t_morgoth > 500)) {
-                borg_note(format("# Morgoth has not been seen in %d turns.  "
+            if (borg.mon.unique == borg.id.morgoth
+                && (borg_timer(borg.time.morgoth) > 500)) {
+                borg_note(format("# Morgoth has not been seen in %ld turns.  "
                                  "Going to hunt him.",
-                    borg_t - borg_t_morgoth));
-                morgoth_on_level = false;
+                    (long int)borg_timer(borg.time.morgoth)));
+                borg.near.morgoth = false;
             }
 
             /* Morgoth has not been seen in a very long time */
-            if (borg_t - borg_t_morgoth > 2500) {
+            if (borg_timer(borg.time.morgoth) > 2500) {
                 borg_note(
-                    format("# Morgoth has not been seen in %d turns.  No show.",
-                        borg_t - borg_t_morgoth));
-                unique_on_level = 0;
+                    format("# Morgoth has not been seen in %ld turns.  No show.",
+                        (long int)borg_timer(borg.time.morgoth)));
+                borg.mon.unique = 0;
             }
         }
 
@@ -2407,10 +2444,13 @@ void borg_update(void)
             borg.resistance = 0;
         }
 
-        /* Reduce fear over time */
-        if (!(borg_t % 10)) {
-            for (y = 0; y < 6; y++) {
-                for (x = 0; x < 18; x++) {
+        /* Reduce fear over time every 10 steps */
+        if (!(borg.time.now % 10)) {
+            max_x = (AUTO_MAX_X / 11) + 1;
+            max_y = (AUTO_MAX_Y / 11) + 1;
+
+            for (y = 0; y < max_y; y++) {
+                for (x = 0; x < max_x; x++) {
                     if (borg_fear_region[y][x])
                         borg_fear_region[y][x]--;
                 }
@@ -2444,15 +2484,9 @@ void borg_update(void)
                 }
             }
 
-            /* Time stamp this new panel-- to avoid a repeated motion bug */
-            borg.time_this_panel = 1;
+            /* reset the anti-bounce count to avoid a repeated motion bug */
+            borg.antibounce_count = 1;
         }
-
-        /* Examine the world while in town. */
-        if (!borg.trait[BI_CDEPTH])
-            borg_do_inven = true;
-        if (!borg.trait[BI_CDEPTH])
-            borg_do_equip = true;
     }
 
     /*** Update the map ***/
@@ -2556,8 +2590,8 @@ void borg_update(void)
      * #4432101234#
      * ############
      */
-    borg_morgoth_position = false;
-    if (!borg.trait[BI_KING] && morgoth_on_level) {
+    borg.morgoth_position = false;
+    if (!borg.trait[BI_KING] && borg.near.morgoth) {
         /* Must be in a fairly central region */
         if (borg.c.y >= 15 && borg.c.y <= AUTO_MAX_Y - 15 && borg.c.x >= 50
             && borg.c.x <= AUTO_MAX_X - 50) {
@@ -2576,7 +2610,7 @@ void borg_update(void)
 
             /* Number of perfect grids */
             if (floor_glyphed == 24)
-                borg_morgoth_position = true;
+                borg.morgoth_position = true;
 
         } /* Centrally located */
     } /* on depth 100 not King */
@@ -2630,9 +2664,9 @@ void borg_update(void)
 
     /* Number of perfect grids */
     if (floor_grid == 1)
-        borg_as_position = true;
+        borg.status.anti_summon = true;
     else
-        borg_as_position = false;
+        borg.status.anti_summon = false;
 
     /* Examine changing doors while shallow */
     if (borg.trait[BI_CLEVEL] <= 5 && borg.trait[BI_CDEPTH]
@@ -2650,13 +2684,12 @@ void borg_update(void)
                 /* This door was not opened by me */
                 borg_note(format(
                     "# Monster opened door at %d,%d.  That's scary.", y, x));
-                scaryguy_on_level = true;
+                borg.mon.scary = true;
             }
         }
     }
 
     /*** Track objects and monsters ***/
-
     /* Pass 1 -- stationary monsters */
     for (i = borg_wank_num - 1; i >= 0; i--) {
         borg_wank *wank = &borg_wanks[i];
@@ -2909,7 +2942,7 @@ void borg_update(void)
             continue;
 
         /* Skip seen monsters */
-        if (kill->when == borg_t)
+        if (kill->when == borg.time.now)
             continue;
 
         /* Skip assigned monsters */
@@ -2924,11 +2957,15 @@ void borg_update(void)
         borg_follow_kill(i);
     }
 
-    /* Update the fear_grid_monsters[][] with the monsters danger
+
+    /* loop through the monsters
+     * - Update the fear_grid_monsters[][] with the monsters danger
      * This will provide a 'regional' fear from the accumulated
      * group of monsters.  One Orc won't be too dangerous, but 20
      * of them can be deadly.
+     * - count up breeders
      */
+    borg.mon.breeders = 0;
     for (i = 1; i < borg_kills_nxt; i++) {
         int p;
 
@@ -2945,6 +2982,9 @@ void borg_update(void)
 
         r_ptr = &r_info[kill->r_idx];
 
+        if (rf_has(r_ptr->flags, RF_MULTIPLY))
+            borg.mon.breeders++;
+
         /* Skip monsters that dont chase */
         if (rf_has(r_ptr->flags, RF_NEVER_MOVE))
             continue;
@@ -2954,7 +2994,7 @@ void borg_update(void)
             continue;
 
         /* Skip monsters in vaults */
-        if (vault_on_level) {
+        if (borg.status.vault) {
             /* Check adjacent grids to monster */
             for (ii = 0; ii < 8; ii++) {
                 /* Grid in that direction */
@@ -2997,11 +3037,11 @@ void borg_update(void)
         borg_take *take = &borg_takes[i];
 
         /* Skip dead objects */
-        if (!take->kind)
+        if (!take->kidx)
             continue;
 
         /* Skip seen objects */
-        if (take->when >= borg_t - 2)
+        if (borg_timer(take->when) <= 2)
             continue;
 
         /* Blind or hallucinating */
@@ -3050,8 +3090,112 @@ void borg_update(void)
     borg.goal.g = borg.c;
 }
 
+
+void borg_free_detection(void)
+{
+    int i;
+    /* arrays are one larger than the number of panels */
+    int array_size_y = old_panels.y + 1;
+
+    if (borg_detect_wall == NULL
+        && borg_detect_trap == NULL
+        && borg_detect_door == NULL
+        && borg_detect_evil == NULL
+        && borg_detect_obj == NULL)
+        return;
+
+    if (borg_detect_wall) {
+        for (i = 0; i < array_size_y; i++) {
+            mem_free(borg_detect_wall[i]);
+        }
+        mem_free(borg_detect_wall);
+        borg_detect_wall = NULL;
+    }
+
+    if (borg_detect_trap) {
+        for (i = 0; i < array_size_y; i++) {
+            mem_free(borg_detect_trap[i]);
+        }
+        mem_free(borg_detect_trap);
+        borg_detect_trap = NULL;
+    }
+
+    if (borg_detect_door) {
+        for (i = 0; i < array_size_y; i++) {
+            mem_free(borg_detect_door[i]);
+        }
+        mem_free(borg_detect_door);
+        borg_detect_door = NULL;
+    }
+
+    if (borg_detect_evil) {
+        for (i = 0; i < array_size_y; i++) {
+            mem_free(borg_detect_evil[i]);
+        }
+        mem_free(borg_detect_evil);
+        borg_detect_evil = NULL;
+    }
+
+    if (borg_detect_obj) {
+        for (i = 0; i < array_size_y; i++) {
+            mem_free(borg_detect_obj[i]);
+        }
+        mem_free(borg_detect_obj);
+        borg_detect_obj = NULL;
+    }
+
+    old_panels.x = -1;
+    old_panels.y = -1;
+}
+
+void borg_alloc_detection(void)
+{
+    int i;
+    /* arrays are one larger than the number of panels */
+    /* this is because the code is sloppy about current panel plus one */
+    int array_size_y = borg.panels.y + 1;
+    int array_size_x = borg.panels.x + 1;
+
+    /* only reallocate the detection arrays if the number of panels */
+    /* has changed */
+    if (old_panels.x == borg.panels.x && old_panels.y == borg.panels.y) {
+        return;
+    }
+
+    borg_free_detection();
+
+    borg_detect_wall = mem_zalloc(array_size_y * sizeof(bool *));
+    for (i = 0; i < array_size_y; i++) {
+        borg_detect_wall[i] = mem_zalloc(array_size_x * sizeof(bool));
+    }
+
+    borg_detect_trap = mem_zalloc(array_size_y * sizeof(bool *));
+    for (i = 0; i < array_size_y; i++) {
+        borg_detect_trap[i] = mem_zalloc(array_size_x * sizeof(bool));
+    }
+
+    borg_detect_door = mem_zalloc(array_size_y * sizeof(bool *));
+    for (i = 0; i < array_size_y; i++) {
+        borg_detect_door[i] = mem_zalloc(array_size_x * sizeof(bool));
+    }
+
+    borg_detect_evil = mem_zalloc(array_size_y * sizeof(bool *));
+    for (i = 0; i < array_size_y; i++) {
+        borg_detect_evil[i] = mem_zalloc(array_size_x * sizeof(bool));
+    }
+
+    borg_detect_obj = mem_zalloc(array_size_y * sizeof(bool *));
+    for (i = 0; i < array_size_y; i++) {
+        borg_detect_obj[i] = mem_zalloc(array_size_x * sizeof(bool));
+    }
+
+    old_panels = borg.panels;
+}
+
 void borg_init_update(void)
 {
+    borg_free_update();
+
     /* Array of "wanks" */
     borg_wanks = mem_zalloc(AUTO_VIEW_MAX * sizeof(borg_wank));
 
@@ -3063,8 +3207,10 @@ void borg_init_update(void)
 
 void borg_free_update(void)
 {
-    mem_free(borg_wanks);
-    borg_wanks = NULL;
+    if (borg_wanks) {
+        mem_free(borg_wanks);
+        borg_wanks = NULL;
+    }
 }
 
 #endif

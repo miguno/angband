@@ -55,6 +55,11 @@ extern void borg_reinit_options(void);
 extern void borg_reset_ignore(void);
 
 /*
+ * Reset the settings
+ */
+extern void borg_reset_settings(void);
+
+/*
  * Prepare some stuff based on the player race and class
  */
 extern void borg_prepare_race_class_info(void);

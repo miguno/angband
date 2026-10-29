@@ -75,7 +75,7 @@ bool borg_recover(void)
     p = borg_danger(borg.c.y, borg.c.x, 1, true, false);
 
     /* Never recover in dangerous situations */
-    if (p > avoidance / 4)
+    if (p > borg.avoidance / 4)
         return false;
 
     /*** Roll for "paranoia" ***/
@@ -334,7 +334,7 @@ bool borg_recover(void)
                 borg_note("# Resting to recharge a rod...");
 
                 /* Reset the Bouncing-borg Timer */
-                borg.time_this_panel = 0;
+                borg.antibounce_count = 0;
 
                 /* Rest until done */
                 borg_keypress('R');
@@ -365,7 +365,7 @@ bool borg_recover(void)
             || borg.trait[BI_CURSP] < borg.trait[BI_MAXSP]
                                           * (borg.trait[BI_CDEPTH] > 85 ? 7 : 6)
                                           / 10)) {
-        if (borg_check_rest(borg.c.y, borg.c.x) && !scaryguy_on_level
+        if (borg_check_rest(borg.c.y, borg.c.x) && !borg.mon.scary
             && p <= borg_fear_region[borg.c.y / 11][borg.c.x / 11]
             && borg.goal.type != GOAL_RECOVER) {
 
@@ -379,11 +379,11 @@ bool borg_recover(void)
                 borg_keypress('&');
                 borg_keypress(KC_ENTER);
 
-                /* Reset our panel clock, we need to be here */
-                borg.time_this_panel = 0;
+                /* Reset anti-bounce count, we need to be here */
+                borg.antibounce_count = 0;
 
                 /* reset the inviso clock to avoid loops */
-                borg.need_see_invis = borg_t - 50;
+                borg.need_see_invis = borg.time.now;
 
                 /* Done */
                 return true;
@@ -400,7 +400,7 @@ bool borg_recover(void)
     if (borg.trait[BI_MAXSP]
         && (borg.trait[BI_CLEVEL] <= 40 || borg.trait[BI_CDEPTH] >= 85)
         && borg.trait[BI_CURSP] < (borg.trait[BI_MAXSP] * 8 / 10)
-        && p < avoidance * 1 / 10 && borg_check_rest(borg.c.y, borg.c.x)) {
+        && p < borg.avoidance * 1 / 10 && borg_check_rest(borg.c.y, borg.c.x)) {
         if (!borg.trait[BI_ISWEAK] && !borg.trait[BI_ISCUT]
             && !borg.trait[BI_ISHUNGRY] && !borg.trait[BI_ISPOISONED]
             && borg.trait[BI_FOOD] > 2 && !borg.munchkin_mode) {

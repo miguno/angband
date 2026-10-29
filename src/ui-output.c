@@ -104,16 +104,25 @@ static void display_area(const wchar_t *text, const uint8_t *attrs,
 		size_t n_lines,
 		region area, size_t line_from)
 {
-	size_t i, j;
+	size_t i;
 
 	n_lines = MIN(n_lines, (size_t) area.page_rows);
 
 	for (i = 0; i < n_lines; i++) {
+		size_t st = line_starts[line_from + i];
+		size_t ll = line_lengths[line_from + i];
+		size_t j0, j1;
+
 		Term_erase(area.col, area.row + i, area.width);
-		for (j = 0; j < line_lengths[line_from + i]; j++) {
-			Term_putch(area.col + j, area.row + i,
-					attrs[line_starts[line_from + i] + j],
-					text[line_starts[line_from + i] + j]);
+		for (j0 = 0; j0 < ll; j0 = j1) {
+			uint8_t a = attrs[st + j0];
+
+			j1 = j0 + 1;
+			while (j1 < ll && attrs[st + j1] == a) {
+				++j1;
+			}
+			Term_queue_chars(area.col + j0, area.row + i,
+				(int)(j1 - j0), a, text + st + j0);
 		}
 	}
 }
@@ -246,8 +255,9 @@ struct keypress textui_textblock_show(textblock *tb, region orig_area, const cha
  * Once this function has been called, the cursor should not be moved
  * until all the related "text_out()" calls to the window are complete.
  *
- * This function will correctly handle any width up to the maximum legal
- * value of 256, though it works best for a standard 80 character width.
+ * This function will correctly handle strings that convert to wide character
+ * strings which are 1024 characters long or less.  Strings converting to more
+ * than 1024 wide characters will be truncated to 1024 wide characters.
  */
 void text_out_to_screen(uint8_t a, const char *str)
 {
@@ -259,6 +269,7 @@ void text_out_to_screen(uint8_t a, const char *str)
 
 	const wchar_t *s;
 	wchar_t buf[1024];
+	size_t nc;
 
 	/* Obtain the size */
 	(void)Term_get_size(&wid, &h);
@@ -266,9 +277,12 @@ void text_out_to_screen(uint8_t a, const char *str)
 	/* Obtain the cursor */
 	(void)Term_locate(&x, &y);
 
-	/* Copy to a rewriteable string */
-	text_mbstowcs(buf, str, 1024);
-	
+	/* Convert to wide characters */
+	nc = text_mbstowcs(buf, str, 1024);
+	if (nc == (size_t)-1 || nc == 0) {
+		return;
+	}
+
 	/* Use special wrapping boundary? */
 	if ((text_out_wrap > 0) && (text_out_wrap < wid))
 		wrap = text_out_wrap;
@@ -276,7 +290,7 @@ void text_out_to_screen(uint8_t a, const char *str)
 		wrap = wid;
 
 	/* Process the string */
-	for (s = buf; *s; s++) {
+	for (s = buf; s < buf + nc; s++) {
 		wchar_t ch;
 
 		/* Force wrap */
@@ -286,7 +300,7 @@ void text_out_to_screen(uint8_t a, const char *str)
 			y++;
 
 			/* Clear line, move cursor */
-			Term_erase(x, y, 255);
+			Term_erase(x, y, wid - x);
 
 			x += text_out_pad;
 			Term_gotoxy(x, y);
@@ -299,20 +313,20 @@ void text_out_to_screen(uint8_t a, const char *str)
 
 		/* Wrap words as needed */
 		if ((x >= wrap - 1) && (ch != L' ')) {
-			int i, n = 0;
-
-			int av[256];
-			wchar_t cv[256];
+			int i, j, n = 0;
+			int av[40];
+			wchar_t cv[40];
 
 			/* Wrap word */
 			if (x < wrap) {
 				/* Scan existing text */
-				for (i = wrap - 2; i >= 0; i--) {
+				for (i = wrap - 2, j = (int)N_ELEMENTS(av) - 1;
+						i >= 0 && j >= 0; i--, j--) {
 					/* Grab existing attr/char */
-					Term_what(i, y, &av[i], &cv[i]);
+					Term_what(i, y, &av[j], &cv[j]);
 
 					/* Break on space */
-					if (cv[i] == L' ') break;
+					if (cv[j] == L' ') break;
 
 					/* Track current word */
 					n = i;
@@ -323,25 +337,35 @@ void text_out_to_screen(uint8_t a, const char *str)
 			if (n == 0) n = wrap;
 
 			/* Clear line */
-			Term_erase(n, y, 255);
+			Term_erase(n, y, wid - n);
 
 			/* Wrap */
 			x = text_out_indent;
 			y++;
 
 			/* Clear line, move cursor */
-			Term_erase(x, y, 255);
+			Term_erase(x, y, wid - x);
 
 			x += text_out_pad;
 			Term_gotoxy(x, y);
 
 			/* Wrap the word (if any) */
-			for (i = n; i < wrap - 1; i++) {
+			for (i = n, j = (int)N_ELEMENTS(av) + 1 - wrap + n;
+					i < wrap - 1; i++, j++) {
 				/* Dump */
-				Term_addch(av[i], cv[i]);
+				Term_addch(av[j], cv[j]);
+			}
 
-				/* Advance (no wrap) */
-				if (++x > wrap) x = wrap;
+			/*
+			 * Advance (no wrap) after adding wrap - 1 - n
+			 * characters
+			 */
+			if (wrap - 1 > n) {
+				if (x <= n + 1) {
+					x += wrap - 1 - n;
+				} else {
+					x = wrap;
+				}
 			}
 		}
 
@@ -384,7 +408,7 @@ void put_str(const char *str, int row, int col) {
  */
 void c_prt(uint8_t attr, const char *str, int row, int col) {
 	/* Clear line, position cursor */
-	Term_erase(col, row, 255);
+	Term_erase(col, row, Term->wid - col);
 
 	/* Dump the attr/text */
 	Term_addstr(-1, attr, str);
@@ -409,7 +433,7 @@ void prt(const char *str, int row, int col) {
  * important that every call to screen_save() is balanced by a call to
  * screen_load() or screen_load_all() later on.  'screen_save_depth' is used
  * by the game to keep track of whether it should try to update the map and
- * sidebar or not, so if you miss out a screen_load or screen_load_all you will
+ * sidebar or not, so if you skip a screen_load or screen_load_all you will
  * not get proper game updates.
  *
  * Term_save() / Term_load() / Term_load_all() do all the heavy lifting here.

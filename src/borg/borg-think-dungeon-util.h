@@ -24,6 +24,12 @@
 #include "../angband.h"
 
 #ifdef ALLOW_BORG
+#include "borg.h"
+
+/*
+ * Calculate the elapsed time since a given borg_time
+ */
+#define borg_timer(time_in) (borg.time.now - time_in)
 
 /*
  * money Scumming is a type of town scumming for money
